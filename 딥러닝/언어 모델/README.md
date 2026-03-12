@@ -55,7 +55,7 @@ print(f"Test : {len(texts_test)} samples")
 
 ```
 
-### 서전학습된 모델 로드 및 추가학습 진행
+### 서전학습된 모델 로드 및 훈련 준비
 ```python
 import torch
 from torch.utils.data import DataLoader
@@ -96,7 +96,10 @@ model  = AutoModelForSequenceClassification.from_pretrained("roberta-base", num_
 optim  = AdamW(model.parameters(), lr=2e-5)  # Use AdamW optimizer
 
 num_epochs = 8  # Train for 8 epochs
+```
+### 모델 훈련
 
+```python
 # Training loop
 for epoch in range(1, num_epochs+1):
     # 1) Training phase
@@ -148,5 +151,4 @@ for epoch in range(1, num_epochs+1):
     model.save_pretrained(save_dir)       # Save model weights
     tokenizer.save_pretrained(save_dir)   # Save tokenizer files
     print(f"→ Model & Tokenizer saved to: {save_dir}\n")
-
 ```
