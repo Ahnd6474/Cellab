@@ -1,0 +1,7 @@
+path: C:/path/to/your/dataset
+train: images/train
+val: images/valid
+test: images/test
+
+names:
+  0: class_0
