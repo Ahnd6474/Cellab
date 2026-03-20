@@ -1,0 +1,21 @@
+# Core notebook environment
+jupyter
+
+# Shared scientific Python stack
+numpy
+pandas
+scipy
+matplotlib
+scikit-learn
+tqdm
+
+# Deep learning
+torch
+
+# NLP notebooks
+transformers
+datasets
+evaluate
+
+# Computer vision notebooks
+ultralytics
