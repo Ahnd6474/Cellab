@@ -16,7 +16,7 @@ PIXEL_COLUMNS = [f"pixel{i}" for i in range(NUM_PIXELS)]
 
 
 def default_data_dir() -> Path:
-    return Path(__file__).resolve().parent.parent / "머신러닝" / "digit-recognizer"
+    return Path(__file__).resolve().parent
 
 
 def read_digit_csv(csv_path: Path, limit: int | None = None) -> pd.DataFrame:
