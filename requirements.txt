@@ -8,6 +8,7 @@ scipy
 matplotlib
 scikit-learn
 tqdm
+catboost
 
 # Deep learning
 torch
