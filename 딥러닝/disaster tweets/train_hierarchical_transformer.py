@@ -128,21 +128,18 @@ def build_vocab(texts: Sequence[str], min_freq: int) -> dict[str, int]:
 
 
 @dataclass
-class HierarchicalBatch:
+class TransformerBatch:
     input_ids: torch.Tensor
-    token_mask: torch.Tensor
-    chunk_mask: torch.Tensor
+    attention_mask: torch.Tensor
     labels: Optional[torch.Tensor] = None
 
 
-class HierarchicalCollator:
-    def __init__(self, tokenizer, max_tokens: int, chunk_size: int, max_chunks: int):
+class TransformerCollator:
+    def __init__(self, tokenizer: BasicTokenizer, max_tokens: int):
         self.tokenizer = tokenizer
         self.max_tokens = max_tokens
-        self.chunk_size = chunk_size
-        self.max_chunks = max_chunks
 
-    def __call__(self, batch: Sequence[dict]) -> HierarchicalBatch:
+    def __call__(self, batch: Sequence[dict]) -> TransformerBatch:
         texts = [sample["text"] for sample in batch]
         encoded = self.tokenizer(
             texts,
@@ -153,29 +150,25 @@ class HierarchicalCollator:
         )
 
         batch_size = len(batch)
-        input_ids = torch.zeros((batch_size, self.max_chunks, self.chunk_size), dtype=torch.long)
-        token_mask = torch.zeros((batch_size, self.max_chunks, self.chunk_size), dtype=torch.bool)
-        chunk_mask = torch.zeros((batch_size, self.max_chunks), dtype=torch.bool)
+        input_ids = torch.full(
+            (batch_size, self.max_tokens),
+            fill_value=self.tokenizer.pad_token_id,
+            dtype=torch.long,
+        )
+        attention_mask = torch.zeros((batch_size, self.max_tokens), dtype=torch.bool)
 
         for row_idx, token_ids in enumerate(encoded["input_ids"]):
-            chunks = [
-                token_ids[start : start + self.chunk_size]
-                for start in range(0, min(len(token_ids), self.chunk_size * self.max_chunks), self.chunk_size)
-            ]
-            for chunk_idx, chunk in enumerate(chunks[: self.max_chunks]):
-                length = len(chunk)
-                input_ids[row_idx, chunk_idx, :length] = torch.tensor(chunk, dtype=torch.long)
-                token_mask[row_idx, chunk_idx, :length] = True
-                chunk_mask[row_idx, chunk_idx] = True
+            length = min(len(token_ids), self.max_tokens)
+            input_ids[row_idx, :length] = torch.tensor(token_ids[:length], dtype=torch.long)
+            attention_mask[row_idx, :length] = True
 
         labels = None
         if "label" in batch[0]:
             labels = torch.tensor([sample["label"] for sample in batch], dtype=torch.long)
 
-        return HierarchicalBatch(
+        return TransformerBatch(
             input_ids=input_ids,
-            token_mask=token_mask,
-            chunk_mask=chunk_mask,
+            attention_mask=attention_mask,
             labels=labels,
         )
 
@@ -208,30 +201,26 @@ class PositionalEncoding(nn.Module):
         return x + self.pe[:, : x.size(1)]
 
 
-class HierarchicalTransformerClassifier(nn.Module):
+class TransformerClassifier(nn.Module):
     def __init__(
         self,
         vocab_size: int,
         pad_token_id: int,
-        chunk_size: int,
-        max_chunks: int,
+        max_tokens: int,
         hidden_size: int,
         num_heads: int,
-        num_token_layers: int,
-        num_chunk_layers: int,
+        num_layers: int,
         ff_dim: int,
         dropout: float,
         num_labels: int = 2,
     ):
         super().__init__()
-        self.pad_token_id = pad_token_id
         self.hidden_size = hidden_size
         self.token_embedding = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.token_position = PositionalEncoding(chunk_size, hidden_size)
-        self.chunk_position = PositionalEncoding(max_chunks, hidden_size)
+        self.position = PositionalEncoding(max_tokens, hidden_size)
         self.embedding_dropout = nn.Dropout(dropout)
 
-        token_layer = nn.TransformerEncoderLayer(
+        encoder_layer = nn.TransformerEncoderLayer(
             d_model=hidden_size,
             nhead=num_heads,
             dim_feedforward=ff_dim,
@@ -240,60 +229,31 @@ class HierarchicalTransformerClassifier(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.token_encoder = nn.TransformerEncoder(token_layer, num_layers=num_token_layers)
-        self.token_pooler = AttentionPooling(hidden_size)
-
-        chunk_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_size,
-            nhead=num_heads,
-            dim_feedforward=ff_dim,
-            dropout=dropout,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers,
+            enable_nested_tensor=False,
         )
-        self.chunk_encoder = nn.TransformerEncoder(chunk_layer, num_layers=num_chunk_layers)
-        self.chunk_pooler = AttentionPooling(hidden_size)
+        self.pooler = AttentionPooling(hidden_size)
         self.norm = nn.LayerNorm(hidden_size)
         self.classifier = nn.Linear(hidden_size, num_labels)
 
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-        token_mask: torch.Tensor,
-        chunk_mask: torch.Tensor,
-    ) -> torch.Tensor:
-        batch_size, max_chunks, chunk_size = input_ids.shape
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        safe_attention_mask = attention_mask.clone()
+        empty_rows = ~safe_attention_mask.any(dim=1)
+        safe_attention_mask[empty_rows, 0] = True
 
-        flat_input_ids = input_ids.view(batch_size * max_chunks, chunk_size)
-        flat_token_mask = token_mask.view(batch_size * max_chunks, chunk_size)
-        safe_flat_token_mask = flat_token_mask.clone()
-        empty_token_rows = ~safe_flat_token_mask.any(dim=1)
-        safe_flat_token_mask[empty_token_rows, 0] = True
+        embeddings = self.token_embedding(input_ids) * math.sqrt(self.hidden_size)
+        embeddings = self.position(embeddings)
+        embeddings = self.embedding_dropout(embeddings)
 
-        token_embeddings = self.token_embedding(flat_input_ids) * math.sqrt(self.hidden_size)
-        token_embeddings = self.token_position(token_embeddings)
-        token_embeddings = self.embedding_dropout(token_embeddings)
-
-        encoded_tokens = self.token_encoder(
-            token_embeddings,
-            src_key_padding_mask=~safe_flat_token_mask,
+        encoded_tokens = self.encoder(
+            embeddings,
+            src_key_padding_mask=~safe_attention_mask,
         )
-        chunk_vectors = self.token_pooler(encoded_tokens, flat_token_mask)
-        chunk_vectors = chunk_vectors.view(batch_size, max_chunks, self.hidden_size)
-
-        safe_chunk_mask = chunk_mask.clone()
-        empty_chunk_rows = ~safe_chunk_mask.any(dim=1)
-        safe_chunk_mask[empty_chunk_rows, 0] = True
-        chunk_vectors = self.chunk_position(chunk_vectors)
-        chunk_vectors = self.embedding_dropout(chunk_vectors)
-        encoded_chunks = self.chunk_encoder(
-            chunk_vectors,
-            src_key_padding_mask=~safe_chunk_mask,
-        )
-        tweet_vector = self.chunk_pooler(encoded_chunks, chunk_mask)
-        tweet_vector = self.norm(tweet_vector)
-        return self.classifier(tweet_vector)
+        pooled = self.pooler(encoded_tokens, attention_mask)
+        pooled = self.norm(pooled)
+        return self.classifier(pooled)
 
 
 def evaluate(model, dataloader, criterion, device):
@@ -306,8 +266,7 @@ def evaluate(model, dataloader, criterion, device):
         for batch in dataloader:
             logits = model(
                 input_ids=batch.input_ids.to(device),
-                token_mask=batch.token_mask.to(device),
-                chunk_mask=batch.chunk_mask.to(device),
+                attention_mask=batch.attention_mask.to(device),
             )
             labels = batch.labels.to(device)
             loss = criterion(logits, labels)
@@ -332,8 +291,7 @@ def predict(model, dataloader, device):
         for batch in dataloader:
             logits = model(
                 input_ids=batch.input_ids.to(device),
-                token_mask=batch.token_mask.to(device),
-                chunk_mask=batch.chunk_mask.to(device),
+                attention_mask=batch.attention_mask.to(device),
             )
             probs = torch.softmax(logits, dim=-1)[:, 1].cpu().tolist()
             preds = torch.argmax(logits, dim=-1).cpu().tolist()
@@ -343,16 +301,14 @@ def predict(model, dataloader, device):
     return predictions, probabilities
 
 
-def build_classifier(args, tokenizer: BasicTokenizer) -> HierarchicalTransformerClassifier:
-    return HierarchicalTransformerClassifier(
+def build_classifier(args, tokenizer: BasicTokenizer) -> TransformerClassifier:
+    return TransformerClassifier(
         vocab_size=tokenizer.vocab_size,
         pad_token_id=tokenizer.pad_token_id,
-        chunk_size=args.chunk_size,
-        max_chunks=args.max_chunks,
+        max_tokens=args.max_tokens,
         hidden_size=args.hidden_size,
         num_heads=args.num_heads,
-        num_token_layers=args.num_token_layers,
-        num_chunk_layers=args.num_chunk_layers,
+        num_layers=args.num_layers,
         ff_dim=args.ff_dim,
         dropout=args.dropout,
     )
@@ -379,11 +335,9 @@ def generate_submission(
     sample_submission = pd.read_csv(data_dir / "sample_submission.csv")
     test_df["model_text"] = test_df.apply(build_model_text, axis=1)
 
-    collator = HierarchicalCollator(
+    collator = TransformerCollator(
         tokenizer=tokenizer,
         max_tokens=checkpoint_config.max_tokens,
-        chunk_size=checkpoint_config.chunk_size,
-        max_chunks=checkpoint_config.max_chunks,
     )
     test_loader = DataLoader(
         TweetDataset(test_df["model_text"].tolist()),
@@ -401,7 +355,7 @@ def generate_submission(
         )
     target_column = submission.columns[-1]
     submission[target_column] = test_predictions
-    submission_path = output_dir / "submission.csv"
+    submission_path = output_dir / "submission_transformer.csv"
     submission.to_csv(submission_path, index=False)
 
     pd.DataFrame(
@@ -410,7 +364,7 @@ def generate_submission(
             "target": test_predictions,
             "prob_disaster": test_probabilities,
         }
-    ).to_csv(output_dir / "test_probabilities_hierarchical_transformer.csv", index=False)
+    ).to_csv(output_dir / "test_probabilities_transformer.csv", index=False)
 
     return submission_path
 
@@ -433,11 +387,9 @@ def train(args) -> None:
 
     vocab = build_vocab(train_texts, min_freq=args.min_freq)
     tokenizer = BasicTokenizer(vocab=vocab)
-    collator = HierarchicalCollator(
+    collator = TransformerCollator(
         tokenizer=tokenizer,
         max_tokens=args.max_tokens,
-        chunk_size=args.chunk_size,
-        max_chunks=args.max_chunks,
     )
 
     train_loader = DataLoader(
@@ -461,7 +413,7 @@ def train(args) -> None:
     best_f1 = -1.0
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    model_path = output_dir / "best_hierarchical_transformer.pt"
+    model_path = output_dir / "best_transformer.pt"
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -471,8 +423,7 @@ def train(args) -> None:
         for batch in progress:
             logits = model(
                 input_ids=batch.input_ids.to(device),
-                token_mask=batch.token_mask.to(device),
-                chunk_mask=batch.chunk_mask.to(device),
+                attention_mask=batch.attention_mask.to(device),
             )
             labels = batch.labels.to(device)
             loss = criterion(logits, labels)
@@ -519,7 +470,7 @@ def train(args) -> None:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Train a hierarchical transformer for Kaggle disaster tweets.",
+        description="Train a transformer classifier for Kaggle disaster tweets.",
     )
     parser.add_argument("--data-dir", type=str, default=str(Path(__file__).resolve().parent))
     parser.add_argument("--output-dir", type=str, default=str(Path(__file__).resolve().parent / "outputs"))
@@ -528,15 +479,12 @@ def parse_args():
     parser.add_argument("--eval-batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-2)
-    parser.add_argument("--hidden-size", type=int, default=192)
-    parser.add_argument("--ff-dim", type=int, default=384)
-    parser.add_argument("--num-heads", type=int, default=6)
-    parser.add_argument("--num-token-layers", type=int, default=2)
-    parser.add_argument("--num-chunk-layers", type=int, default=2)
+    parser.add_argument("--hidden-size", type=int, default=256)
+    parser.add_argument("--ff-dim", type=int, default=1024)
+    parser.add_argument("--num-heads", type=int, default=8)
+    parser.add_argument("--num-layers", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--max-tokens", type=int, default=96)
-    parser.add_argument("--chunk-size", type=int, default=16)
-    parser.add_argument("--max-chunks", type=int, default=6)
     parser.add_argument("--val-size", type=float, default=0.2)
     parser.add_argument("--min-freq", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
