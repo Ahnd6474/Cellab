@@ -523,7 +523,7 @@ def parse_args():
     )
     parser.add_argument("--data-dir", type=str, default=str(Path(__file__).resolve().parent))
     parser.add_argument("--output-dir", type=str, default=str(Path(__file__).resolve().parent / "outputs"))
-    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--eval-batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
