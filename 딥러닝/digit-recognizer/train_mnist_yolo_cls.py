@@ -21,9 +21,9 @@ from mnist_idx_reader import MnistDataloader, default_split_paths
 
 DEFAULT_EPOCHS = 20
 DEFAULT_BATCH = 128
-DEFAULT_IMGSZ = 64
+DEFAULT_IMGSZ = 32
 DEFAULT_PATIENCE = 10
-DEFAULT_PREDICT_BATCH = 256
+DEFAULT_PREDICT_BATCH = 4096
 
 
 def default_output_dir() -> Path:
