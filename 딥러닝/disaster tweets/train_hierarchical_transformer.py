@@ -395,6 +395,10 @@ def generate_submission(
     test_predictions, test_probabilities = predict(model, test_loader, device)
 
     submission = sample_submission.copy()
+    if len(submission) != len(test_predictions):
+        raise ValueError(
+            f"sample submission row count ({len(submission)}) does not match predictions ({len(test_predictions)})."
+        )
     target_column = submission.columns[-1]
     submission[target_column] = test_predictions
     submission_path = output_dir / "submission.csv"

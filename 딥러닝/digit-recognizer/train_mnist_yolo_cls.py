@@ -176,9 +176,10 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
     for input_path in [config.train_images, config.train_labels, config.test_images, config.test_labels]:
         if not input_path.exists():
             raise FileNotFoundError(f"MNIST IDX file not found: {input_path}")
-    for input_path in [config.test_csv, config.sample_submission]:
-        if not input_path.exists():
-            raise FileNotFoundError(f"Submission input file not found: {input_path}")
+    if config.submission_after_train:
+        for input_path in [config.test_csv, config.sample_submission]:
+            if not input_path.exists():
+                raise FileNotFoundError(f"Submission input file not found: {input_path}")
 
     return config
 
