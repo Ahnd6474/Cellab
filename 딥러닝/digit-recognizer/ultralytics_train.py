@@ -2,27 +2,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import torch
 from ultralytics import YOLO
+from ultralytics.cfg import TASK2MODEL
 
 
-DEFAULT_EPOCHS = 200
+DEFAULT_EPOCHS = 50
 DEFAULT_BATCH = 16
-DEFAULT_IMGSZ = 1024
-DEFAULT_PATIENCE = 100
-DEFAULT_WORKERS = 8
-
-
-def default_project_root() -> Path:
-    return Path(__file__).resolve().parent.parent / "딥러닝" / "이미지 분석 AI"
+DEFAULT_PATIENCE = 20
 
 
 def default_output_dir() -> Path:
-    return default_project_root() / "yolo"
+    return Path(__file__).resolve().parent / "runs"
+
+
+def default_workers() -> int:
+    cpu_count = os.cpu_count() or 1
+    return min(4, cpu_count)
 
 
 def default_device() -> str:
@@ -43,6 +44,14 @@ def resolve_model(model_name_or_path: str) -> str:
     if model_path.exists():
         return str(model_path.resolve())
     return model_name_or_path
+
+
+def default_model_for_task(task: str) -> str:
+    return str(TASK2MODEL.get(task, "yolo26n.pt"))
+
+
+def default_imgsz_for_task(task: str) -> int:
+    return 224 if task == "classify" else 640
 
 
 @dataclass(frozen=True)
@@ -117,12 +126,8 @@ class TrainConfig:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train an Ultralytics model from a local data.yaml file.")
-    parser.add_argument("--data", required=True, help="Path to the dataset YAML file.")
-    parser.add_argument(
-        "--model",
-        default="yolo11s.pt",
-        help="Ultralytics model name or local checkpoint path. Examples: yolo11s.pt, yolo26s.pt, best.pt",
+    parser = argparse.ArgumentParser(
+        description="Train an Ultralytics model from a dataset YAML or classification directory."
     )
     parser.add_argument(
         "--task",
@@ -130,16 +135,31 @@ def parse_args() -> argparse.Namespace:
         default="detect",
         help="Ultralytics task type.",
     )
+    parser.add_argument(
+        "--data",
+        required=True,
+        help="For classify: dataset directory containing train/val/test. For other tasks: path to data.yaml.",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Ultralytics model name or local checkpoint path. Defaults to the task-appropriate Ultralytics model.",
+    )
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Number of training epochs.")
     parser.add_argument("--batch", type=int, default=DEFAULT_BATCH, help="Batch size.")
-    parser.add_argument("--imgsz", type=int, default=DEFAULT_IMGSZ, help="Square input image size.")
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=None,
+        help="Square input image size. Defaults to 224 for classify and 640 for other tasks.",
+    )
     parser.add_argument("--patience", type=int, default=DEFAULT_PATIENCE, help="Early stopping patience.")
     parser.add_argument(
         "--device",
         default=default_device(),
         help='Training device. Examples: "cpu", "0", "0,1". Defaults to all visible CUDA devices or CPU.',
     )
-    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="Data loader worker count.")
+    parser.add_argument("--workers", type=int, default=default_workers(), help="Data loader worker count.")
     parser.add_argument(
         "--project",
         default=str(default_output_dir()),
@@ -186,22 +206,34 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_data_path(data_path: Path, task: str) -> None:
+    if not data_path.exists():
+        raise FileNotFoundError(f"Dataset path not found: {data_path}")
+
+    if task == "classify":
+        if not data_path.is_dir():
+            raise ValueError(f"For task=classify, --data must be a directory. Got: {data_path}")
+        return
+
+    if data_path.suffix.lower() not in {".yaml", ".yml"}:
+        raise ValueError(f"For task={task}, --data must point to a YAML file. Got: {data_path}")
+
+
 def build_config(args: argparse.Namespace) -> TrainConfig:
     data_path = resolve_path(args.data)
-    if not data_path.exists():
-        raise FileNotFoundError(f"data.yaml not found: {data_path}")
-    if data_path.suffix.lower() not in {".yaml", ".yml"}:
-        raise ValueError(f"Expected a YAML file for --data, got: {data_path}")
+    validate_data_path(data_path=data_path, task=args.task)
 
     project_path = resolve_path(args.project)
+    model_name = args.model or default_model_for_task(args.task)
+    imgsz = args.imgsz if args.imgsz is not None else default_imgsz_for_task(args.task)
 
     return TrainConfig(
         task=args.task,
-        model=resolve_model(args.model),
+        model=resolve_model(model_name),
         data=data_path,
         epochs=args.epochs,
         batch=args.batch,
-        imgsz=args.imgsz,
+        imgsz=imgsz,
         patience=args.patience,
         device=args.device,
         workers=args.workers,
