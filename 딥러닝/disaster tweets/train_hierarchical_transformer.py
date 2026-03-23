@@ -343,17 +343,81 @@ def predict(model, dataloader, device):
     return predictions, probabilities
 
 
+def build_classifier(args, tokenizer: BasicTokenizer) -> HierarchicalTransformerClassifier:
+    return HierarchicalTransformerClassifier(
+        vocab_size=tokenizer.vocab_size,
+        pad_token_id=tokenizer.pad_token_id,
+        chunk_size=args.chunk_size,
+        max_chunks=args.max_chunks,
+        hidden_size=args.hidden_size,
+        num_heads=args.num_heads,
+        num_token_layers=args.num_token_layers,
+        num_chunk_layers=args.num_chunk_layers,
+        ff_dim=args.ff_dim,
+        dropout=args.dropout,
+    )
+
+
+def load_model_from_checkpoint(model_path: Path, device: torch.device):
+    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint_config = argparse.Namespace(**checkpoint["config"])
+    tokenizer = BasicTokenizer(vocab=checkpoint["vocab"])
+    model = build_classifier(checkpoint_config, tokenizer).to(device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    return model, tokenizer, checkpoint_config
+
+
+def generate_submission(
+    data_dir: Path,
+    output_dir: Path,
+    model_path: Path,
+    device: torch.device,
+):
+    model, tokenizer, checkpoint_config = load_model_from_checkpoint(model_path, device)
+
+    test_df = pd.read_csv(data_dir / "test.csv")
+    sample_submission = pd.read_csv(data_dir / "sample_submission.csv")
+    test_df["model_text"] = test_df.apply(build_model_text, axis=1)
+
+    collator = HierarchicalCollator(
+        tokenizer=tokenizer,
+        max_tokens=checkpoint_config.max_tokens,
+        chunk_size=checkpoint_config.chunk_size,
+        max_chunks=checkpoint_config.max_chunks,
+    )
+    test_loader = DataLoader(
+        TweetDataset(test_df["model_text"].tolist()),
+        batch_size=checkpoint_config.eval_batch_size,
+        shuffle=False,
+        collate_fn=collator,
+    )
+
+    test_predictions, test_probabilities = predict(model, test_loader, device)
+
+    submission = sample_submission.copy()
+    target_column = submission.columns[-1]
+    submission[target_column] = test_predictions
+    submission_path = output_dir / "submission.csv"
+    submission.to_csv(submission_path, index=False)
+
+    pd.DataFrame(
+        {
+            "id": test_df["id"],
+            "target": test_predictions,
+            "prob_disaster": test_probabilities,
+        }
+    ).to_csv(output_dir / "test_probabilities_hierarchical_transformer.csv", index=False)
+
+    return submission_path
+
+
 def train(args) -> None:
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
     base_dir = Path(args.data_dir)
 
     train_df = pd.read_csv(base_dir / "train.csv")
-    test_df = pd.read_csv(base_dir / "test.csv")
-    sample_submission = pd.read_csv(base_dir / "sample_submission.csv")
-
     train_df["model_text"] = train_df.apply(build_model_text, axis=1)
-    test_df["model_text"] = test_df.apply(build_model_text, axis=1)
 
     train_texts, val_texts, train_labels, val_labels = train_test_split(
         train_df["model_text"].tolist(),
@@ -384,25 +448,8 @@ def train(args) -> None:
         shuffle=False,
         collate_fn=collator,
     )
-    test_loader = DataLoader(
-        TweetDataset(test_df["model_text"].tolist()),
-        batch_size=args.eval_batch_size,
-        shuffle=False,
-        collate_fn=collator,
-    )
 
-    model = HierarchicalTransformerClassifier(
-        vocab_size=tokenizer.vocab_size,
-        pad_token_id=tokenizer.pad_token_id,
-        chunk_size=args.chunk_size,
-        max_chunks=args.max_chunks,
-        hidden_size=args.hidden_size,
-        num_heads=args.num_heads,
-        num_token_layers=args.num_token_layers,
-        num_chunk_layers=args.num_chunk_layers,
-        ff_dim=args.ff_dim,
-        dropout=args.dropout,
-    ).to(device)
+    model = build_classifier(args, tokenizer).to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -454,24 +501,16 @@ def train(args) -> None:
                 model_path,
             )
 
-    checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-
-    test_predictions, test_probabilities = predict(model, test_loader, device)
-    sample_submission["target"] = test_predictions
-    sample_submission.to_csv(output_dir / "submission_hierarchical_transformer.csv", index=False)
-
-    pd.DataFrame(
-        {
-            "id": test_df["id"],
-            "target": test_predictions,
-            "prob_disaster": test_probabilities,
-        }
-    ).to_csv(output_dir / "test_probabilities_hierarchical_transformer.csv", index=False)
+    submission_path = generate_submission(
+        data_dir=base_dir,
+        output_dir=output_dir,
+        model_path=model_path,
+        device=device,
+    )
 
     print(f"Best validation F1: {best_f1:.4f}")
     print(f"Saved checkpoint to: {model_path}")
-    print(f"Saved submission to: {output_dir / 'submission_hierarchical_transformer.csv'}")
+    print(f"Saved submission to: {submission_path}")
 
 
 def parse_args():

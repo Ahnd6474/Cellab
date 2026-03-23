@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from ultralytics import YOLO
 
+from digit_recognizer_reader import load_digit_images
 from mnist_idx_reader import MnistDataloader, default_split_paths
 
 
@@ -21,6 +23,7 @@ DEFAULT_EPOCHS = 30
 DEFAULT_BATCH = 128
 DEFAULT_IMGSZ = 64
 DEFAULT_PATIENCE = 10
+DEFAULT_PREDICT_BATCH = 256
 
 
 def default_output_dir() -> Path:
@@ -44,6 +47,8 @@ class TrainConfig:
     train_labels: Path
     test_images: Path
     test_labels: Path
+    test_csv: Path
+    sample_submission: Path
     output_dir: Path
     dataset_dir: Path
     project_dir: Path
@@ -66,6 +71,9 @@ class TrainConfig:
     dry_run: bool
     rgb: bool
     test_after_train: bool
+    submission_after_train: bool
+    predict_batch: int
+    submission_filename: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,6 +85,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-labels", type=Path, default=defaults.training_labels_filepath, help="Path to train-labels.idx1-ubyte.")
     parser.add_argument("--test-images", type=Path, default=defaults.test_images_filepath, help="Path to test-images.idx3-ubyte.")
     parser.add_argument("--test-labels", type=Path, default=defaults.test_labels_filepath, help="Path to test-labels.idx1-ubyte.")
+    parser.add_argument("--test-csv", type=Path, default=Path(__file__).resolve().parent / "test.csv", help="Path to the Kaggle test.csv used for submission generation.")
+    parser.add_argument("--sample-submission", type=Path, default=Path(__file__).resolve().parent / "sample_submission.csv", help="Path to the Kaggle sample submission template.")
     parser.add_argument("--output-dir", type=Path, default=default_output_dir(), help="Output root containing the dataset export and training runs.")
     parser.add_argument("--model", default="yolo26n-cls.pt", help="Ultralytics classification model or local checkpoint path.")
     parser.add_argument("--name", default="mnist-cls", help="Ultralytics run name.")
@@ -101,6 +111,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepare-only", action="store_true", help="Only export the Ultralytics classification dataset and skip training.")
     parser.add_argument("--dry-run", action="store_true", help="Print the resolved configuration and exit before writing files.")
     parser.add_argument("--test-after-train", action=argparse.BooleanOptionalAction, default=True, help="Evaluate the best checkpoint on the test split after training.")
+    parser.add_argument("--submission-after-train", action=argparse.BooleanOptionalAction, default=True, help="Generate Kaggle submission.csv from test.csv after training.")
+    parser.add_argument("--predict-batch", type=int, default=DEFAULT_PREDICT_BATCH, help="Batch size used when predicting Kaggle test.csv.")
+    parser.add_argument("--submission-filename", default="submission.csv", help="Filename written under --output-dir for Kaggle predictions.")
     return parser.parse_args()
 
 
@@ -119,6 +132,8 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
         raise ValueError("--train-limit must be positive when provided.")
     if args.test_limit is not None and args.test_limit <= 0:
         raise ValueError("--test-limit must be positive when provided.")
+    if args.predict_batch <= 0:
+        raise ValueError("--predict-batch must be positive.")
 
     output_dir = args.output_dir.resolve()
     dataset_dir = output_dir / "dataset"
@@ -129,6 +144,8 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
         train_labels=args.train_labels.resolve(),
         test_images=args.test_images.resolve(),
         test_labels=args.test_labels.resolve(),
+        test_csv=args.test_csv.resolve(),
+        sample_submission=args.sample_submission.resolve(),
         output_dir=output_dir,
         dataset_dir=dataset_dir,
         project_dir=project_dir,
@@ -151,11 +168,17 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
         dry_run=args.dry_run,
         rgb=args.rgb,
         test_after_train=args.test_after_train,
+        submission_after_train=args.submission_after_train,
+        predict_batch=args.predict_batch,
+        submission_filename=args.submission_filename,
     )
 
     for input_path in [config.train_images, config.train_labels, config.test_images, config.test_labels]:
         if not input_path.exists():
             raise FileNotFoundError(f"MNIST IDX file not found: {input_path}")
+    for input_path in [config.test_csv, config.sample_submission]:
+        if not input_path.exists():
+            raise FileNotFoundError(f"Submission input file not found: {input_path}")
 
     return config
 
@@ -249,6 +272,58 @@ def prepare_dataset(config: TrainConfig) -> tuple[Path, dict[str, Any]]:
     return config.dataset_dir, export_summary
 
 
+def resolve_best_model_path(save_dir: str | os.PathLike[str] | None) -> Path:
+    if save_dir is None:
+        raise FileNotFoundError("Ultralytics save_dir was not set, so best.pt could not be located.")
+
+    best_model_path = Path(save_dir) / "weights" / "best.pt"
+    if not best_model_path.exists():
+        raise FileNotFoundError(f"Best checkpoint not found: {best_model_path}")
+    return best_model_path
+
+
+def render_prediction_image(image_array: np.ndarray, rgb: bool) -> Image.Image:
+    image = Image.fromarray(image_array, mode="L")
+    return image.convert("RGB") if rgb else image
+
+
+def generate_submission(config: TrainConfig, best_model_path: Path) -> Path:
+    test_images, labels = load_digit_images(config.test_csv)
+    if labels is not None:
+        raise ValueError(f"{config.test_csv} should not contain a label column when generating a submission.")
+
+    model = YOLO(str(best_model_path), task="classify")
+    predictions: list[int] = []
+
+    for start in range(0, len(test_images), config.predict_batch):
+        batch_images = [
+            render_prediction_image(image_array, rgb=config.rgb)
+            for image_array in test_images[start : start + config.predict_batch]
+        ]
+        batch_results = model.predict(
+            source=batch_images,
+            imgsz=config.imgsz,
+            batch=len(batch_images),
+            device=config.device,
+            verbose=False,
+        )
+        predictions.extend(int(result.probs.top1) for result in batch_results)
+
+    submission = pd.read_csv(config.sample_submission)
+    if len(submission) != len(predictions):
+        raise ValueError(
+            f"sample submission row count ({len(submission)}) does not match predictions ({len(predictions)})."
+        )
+
+    target_column = submission.columns[-1]
+    submission[target_column] = predictions
+
+    submission_path = config.output_dir / config.submission_filename
+    submission.to_csv(submission_path, index=False)
+    print(f"submission_path={submission_path}")
+    return submission_path
+
+
 def train(config: TrainConfig, dataset_dir: Path) -> None:
     print("training_config=")
     print_config(config)
@@ -283,21 +358,18 @@ def train(config: TrainConfig, dataset_dir: Path) -> None:
         print("train_metrics=")
         print(json.dumps(results_dict, ensure_ascii=False, indent=2))
 
-    if not config.test_after_train:
-        return
+    best_model_path = resolve_best_model_path(save_dir)
+    eval_model = YOLO(str(best_model_path), task="classify")
 
-    best_model_path = None
-    if save_dir is not None:
-        candidate = Path(save_dir) / "weights" / "best.pt"
-        if candidate.exists():
-            best_model_path = candidate
+    if config.test_after_train:
+        test_results = eval_model.val(data=str(dataset_dir), split="test", imgsz=config.imgsz, device=config.device)
+        test_metrics = getattr(test_results, "results_dict", None)
+        if isinstance(test_metrics, dict) and test_metrics:
+            print("test_metrics=")
+            print(json.dumps(test_metrics, ensure_ascii=False, indent=2))
 
-    eval_model = YOLO(str(best_model_path), task="classify") if best_model_path is not None else model
-    test_results = eval_model.val(data=str(dataset_dir), split="test", imgsz=config.imgsz, device=config.device)
-    test_metrics = getattr(test_results, "results_dict", None)
-    if isinstance(test_metrics, dict) and test_metrics:
-        print("test_metrics=")
-        print(json.dumps(test_metrics, ensure_ascii=False, indent=2))
+    if config.submission_after_train:
+        generate_submission(config, best_model_path=best_model_path)
 
 
 def main() -> None:
