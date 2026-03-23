@@ -19,7 +19,7 @@ from digit_recognizer_reader import load_digit_images
 from mnist_idx_reader import MnistDataloader, default_split_paths
 
 
-DEFAULT_EPOCHS = 30
+DEFAULT_EPOCHS = 20
 DEFAULT_BATCH = 128
 DEFAULT_IMGSZ = 64
 DEFAULT_PATIENCE = 10
