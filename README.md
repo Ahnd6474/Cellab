@@ -17,6 +17,13 @@ Cellab/
 │   ├── Readme.md                 # 기초 ML 실습 안내
 │   └── ml_map.svg                # 문제 유형별 알고리즘 선택 참고도
 └── 딥러닝/
+    ├── disaster tweets/
+    │   ├── train_hierarchical_transformer.py # Disaster Tweets 계층형 Transformer 학습 진입점
+    │   └── README.md                         # 데이터셋/실행/출력 설명
+    ├── digit-recognizer/
+    │   ├── train_mnist_yolo_cls.py   # MNIST 기반 digit recognizer 분류 학습 진입점
+    │   ├── ultralytics_train.py      # 준비된 YOLO 데이터셋으로 범용 학습 실행
+    │   └── digit_recognizer_reader.py # CSV 샘플 시각화/점검용
     ├── 이미지 분석 AI/
     │   ├── README.md             # YOLO 기반 객체 탐지 실습
     │   └── yolo/                 # 학습 결과물(가중치/곡선/행렬 등)
@@ -30,6 +37,29 @@ Cellab/
 1. `머신러닝/Readme.md`로 기본 개념 및 모델 선택 감각 익히기
 2. `딥러닝/이미지 분석 AI/README.md`로 비전 태스크 학습 흐름 익히기
 3. `딥러닝/언어 모델/README.md`로 텍스트 분류 파인튜닝 실습하기
+
+## Digit Recognizer 학습 파일
+- `딥러닝/digit-recognizer/train_mnist_yolo_cls.py`를 실행하면 MNIST IDX 파일을 읽어서 분류용 데이터셋을 만든 뒤, YOLO 분류 모델 학습까지 한 번에 진행합니다.
+- 가장 직접적인 학습 진입점은 아래 명령입니다.
+
+```bash
+python "딥러닝/digit-recognizer/train_mnist_yolo_cls.py"
+```
+
+- 무거운 학습을 바로 돌리고 싶지 않다면 설정만 확인하는 `--dry-run`, 데이터셋만 만들고 학습은 건너뛰는 `--prepare-only` 옵션을 사용할 수 있습니다.
+- 참고로 `딥러닝/digit-recognizer/digit_recognizer_reader.py`는 샘플 확인용이며 학습 스크립트가 아닙니다.
+- `딥러닝/digit-recognizer/prepare_yolo_detect_dataset.py`는 CSV를 YOLO 탐지용 데이터셋으로 변환만 하고, 실제 학습은 `딥러닝/digit-recognizer/ultralytics_train.py`에서 수행합니다.
+
+## Disaster Tweets 학습 파일
+- `딥러닝/disaster tweets/train_hierarchical_transformer.py`를 실행하면 같은 폴더의 `train.csv`, `test.csv`, `sample_submission.csv`를 읽어서 계층형 Transformer 기반 분류 모델을 학습합니다.
+- 직접적인 학습 진입점은 아래 명령입니다.
+
+```bash
+python "딥러닝/disaster tweets/train_hierarchical_transformer.py"
+```
+
+- CPU 강제 실행은 `--cpu`, 하이퍼파라미터 조정은 `--epochs`, `--batch-size`, `--hidden-size` 같은 옵션으로 할 수 있습니다.
+- 학습 결과물은 기본적으로 `딥러닝/disaster tweets/outputs` 아래에 체크포인트와 제출 파일로 저장됩니다.
 
 ## 사용 전 준비
 - Python 3.10+ 권장 (일부 예제는 GPU 환경 권장)
