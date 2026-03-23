@@ -481,7 +481,7 @@ def parse_args():
     parser.add_argument("--weight-decay", type=float, default=1e-2)
     parser.add_argument("--hidden-size", type=int, default=512)
     parser.add_argument("--ff-dim", type=int, default=1024)
-    parser.add_argument("--num-heads", type=int, default=8)
+    parser.add_argument("--num-heads", type=int, default=4)
     parser.add_argument("--num-layers", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--max-tokens", type=int, default=96)

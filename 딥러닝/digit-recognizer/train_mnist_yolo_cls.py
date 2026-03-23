@@ -88,7 +88,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-csv", type=Path, default=Path(__file__).resolve().parent / "test.csv", help="Path to the Kaggle test.csv used for submission generation.")
     parser.add_argument("--sample-submission", type=Path, default=Path(__file__).resolve().parent / "sample_submission.csv", help="Path to the Kaggle sample submission template.")
     parser.add_argument("--output-dir", type=Path, default=default_output_dir(), help="Output root containing the dataset export and training runs.")
-    parser.add_argument("--model", default="yolo26n-cls.pt", help="Ultralytics classification model or local checkpoint path.")
+    parser.add_argument("--model", default="yolo26s-cls.pt", help="Ultralytics classification model or local checkpoint path.")
     parser.add_argument("--name", default="mnist-cls", help="Ultralytics run name.")
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Number of training epochs.")
     parser.add_argument("--batch", type=int, default=DEFAULT_BATCH, help="Training batch size.")
