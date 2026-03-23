@@ -1,0 +1,8 @@
+{
+  "base_train_rows": 6050,
+  "validation_rows": 1523,
+  "synthetic_rows": 40,
+  "extra_rows": 0,
+  "final_main_rows": 6090,
+  "extra_training_mode": "pretrain"
+}
