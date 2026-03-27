@@ -20,3 +20,6 @@ evaluate
 
 # Computer vision notebooks
 ultralytics
+
+# Web demo
+flask
