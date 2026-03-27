@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digit Recognizer Ensemble</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.18), transparent 36%),
+        linear-gradient(135deg, #f8fafc, #e2e8f0);
+    }
+    #canvas {
+      touch-action: none;
+      background: #020617;
+      cursor: crosshair;
+    }
+    .prob-bar {
+      transition: width 0.35s ease-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 text-slate-900">
+  <div class="mx-auto max-w-6xl">
+    <div class="mb-8 flex flex-col gap-3">
+      <p class="text-sm font-semibold uppercase tracking-[0.25em] text-amber-600">Digit Recognizer</p>
+      <h1 class="text-4xl font-black tracking-tight md:text-5xl">YOLO26n Seed Ensemble Demo</h1>
+      <p class="max-w-3xl text-sm text-slate-600 md:text-base">
+        브라우저에서 숫자를 그리면 현재 저장된 앙상블 체크포인트의 평균 확률로 예측합니다.
+      </p>
+      <p class="text-xs text-slate-500">
+        Loaded checkpoints:
+        {% for model_path in model_paths %}
+          <span class="font-mono">{{ model_path }}</span>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
+      <section class="rounded-[2rem] border border-white/70 bg-white/80 p-6 shadow-2xl shadow-slate-300/40 backdrop-blur">
+        <div class="mb-5">
+          <h2 class="text-lg font-bold">Draw a digit</h2>
+          <p class="mt-1 text-sm text-slate-500">검은 배경에 흰색으로 한 자리 숫자를 써보세요.</p>
+        </div>
+
+        <canvas id="canvas" width="280" height="280" class="mx-auto block rounded-[1.5rem] border border-slate-800 shadow-inner shadow-slate-950/40"></canvas>
+
+        <div class="mt-6 grid grid-cols-2 gap-3">
+          <button id="clearBtn" class="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200">
+            Clear
+          </button>
+          <button id="predictBtn" class="rounded-2xl bg-amber-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-400">
+            Predict
+          </button>
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-500/20">
+        <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-sky-300">Ensemble Output</p>
+            <div id="mainResult" class="mt-3 text-8xl font-black text-amber-400">?</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 px-4 py-3 text-sm text-slate-300">
+            <div>Inference mode: <span class="font-semibold text-white">soft voting</span></div>
+            <div id="metaInfo" class="mt-1">Models: -</div>
+          </div>
+        </div>
+
+        <div id="errorBox" class="mt-5 hidden rounded-2xl border border-rose-400/40 bg-rose-400/10 px-4 py-3 text-sm text-rose-200"></div>
+
+        <div class="mt-6 grid gap-3" id="probList"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const mainResult = document.getElementById("mainResult");
+    const probList = document.getElementById("probList");
+    const errorBox = document.getElementById("errorBox");
+    const metaInfo = document.getElementById("metaInfo");
+
+    let isDrawing = false;
+
+    function resetCanvas() {
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function resetResults() {
+      mainResult.innerText = "?";
+      metaInfo.innerText = "Models: -";
+      errorBox.classList.add("hidden");
+      errorBox.innerText = "";
+      for (let i = 0; i < 10; i += 1) {
+        document.getElementById(`bar-${i}`).style.width = "0%";
+        document.getElementById(`score-${i}`).innerText = "0.0%";
+      }
+    }
+
+    for (let i = 0; i < 10; i += 1) {
+      probList.innerHTML += `
+        <div class="grid grid-cols-[20px_minmax(0,1fr)_56px] items-center gap-3">
+          <span class="text-sm font-bold text-slate-300">${i}</span>
+          <div class="h-3 overflow-hidden rounded-full bg-white/10">
+            <div id="bar-${i}" class="prob-bar h-full rounded-full bg-gradient-to-r from-sky-400 to-amber-400" style="width: 0%"></div>
+          </div>
+          <span id="score-${i}" class="text-right text-xs font-medium text-slate-400">0.0%</span>
+        </div>
+      `;
+    }
+
+    function getPos(event) {
+      const rect = canvas.getBoundingClientRect();
+      const point = event.touches ? event.touches[0] : event;
+      return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+    }
+
+    function start(event) {
+      isDrawing = true;
+      const pos = getPos(event);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(event) {
+      if (!isDrawing) return;
+      const pos = getPos(event);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.lineWidth = 18;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    }
+
+    function stop() {
+      isDrawing = false;
+    }
+
+    async function predict() {
+      errorBox.classList.add("hidden");
+      errorBox.innerText = "";
+
+      const response = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: canvas.toDataURL("image/png") })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        errorBox.innerText = data.error || "Prediction failed.";
+        errorBox.classList.remove("hidden");
+        return;
+      }
+
+      mainResult.innerText = data.result;
+      metaInfo.innerText = `Models: ${data.num_models}`;
+      data.probabilities.forEach((probability, index) => {
+        const percent = probability * 100;
+        document.getElementById(`bar-${index}`).style.width = `${percent}%`;
+        document.getElementById(`score-${index}`).innerText = `${percent.toFixed(1)}%`;
+      });
+    }
+
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mousemove", draw);
+    window.addEventListener("mouseup", stop);
+    canvas.addEventListener("touchstart", (event) => { event.preventDefault(); start(event); }, { passive: false });
+    canvas.addEventListener("touchmove", (event) => { event.preventDefault(); draw(event); }, { passive: false });
+    window.addEventListener("touchend", stop);
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      resetCanvas();
+      resetResults();
+    });
+    document.getElementById("predictBtn").addEventListener("click", predict);
+
+    resetCanvas();
+    resetResults();
+  </script>
+</body>
+</html>

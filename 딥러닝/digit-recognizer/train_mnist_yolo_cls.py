@@ -24,6 +24,8 @@ DEFAULT_BATCH = 128
 DEFAULT_IMGSZ = 32
 DEFAULT_PATIENCE = 10
 DEFAULT_PREDICT_BATCH = 4096
+DEFAULT_MODEL = "yolo26n-cls.pt"
+DEFAULT_SEEDS = (42, 52, 62)
 
 
 def default_output_dir() -> Path:
@@ -54,6 +56,7 @@ class TrainConfig:
     project_dir: Path
     model: str
     run_name: str
+    seeds: tuple[int, ...]
     epochs: int
     batch: int
     imgsz: int
@@ -88,8 +91,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-csv", type=Path, default=Path(__file__).resolve().parent / "test.csv", help="Path to the Kaggle test.csv used for submission generation.")
     parser.add_argument("--sample-submission", type=Path, default=Path(__file__).resolve().parent / "sample_submission.csv", help="Path to the Kaggle sample submission template.")
     parser.add_argument("--output-dir", type=Path, default=default_output_dir(), help="Output root containing the dataset export and training runs.")
-    parser.add_argument("--model", default="yolo11m-cls.pt", help="Ultralytics classification model or local checkpoint path.")
-    parser.add_argument("--name", default="mnist-cls", help="Ultralytics run name.")
+    parser.add_argument("--model", default=DEFAULT_MODEL, help="Ultralytics classification model or local checkpoint path.")
+    parser.add_argument("--name", default="mnist-yolo26n-ensemble", help="Ultralytics run name prefix.")
+    parser.add_argument(
+        "--seeds",
+        nargs="+",
+        type=int,
+        default=list(DEFAULT_SEEDS),
+        help="One or more training seeds. Each seed trains one model and predictions are averaged.",
+    )
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Number of training epochs.")
     parser.add_argument("--batch", type=int, default=DEFAULT_BATCH, help="Training batch size.")
     parser.add_argument("--imgsz", type=int, default=DEFAULT_IMGSZ, help="Square training image size passed to Ultralytics.")
@@ -113,7 +123,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-after-train", action=argparse.BooleanOptionalAction, default=True, help="Evaluate the best checkpoint on the test split after training.")
     parser.add_argument("--submission-after-train", action=argparse.BooleanOptionalAction, default=True, help="Generate Kaggle submission.csv from test.csv after training.")
     parser.add_argument("--predict-batch", type=int, default=DEFAULT_PREDICT_BATCH, help="Batch size used when predicting Kaggle test.csv.")
-    parser.add_argument("--submission-filename", default="submission.csv", help="Filename written under --output-dir for Kaggle predictions.")
+    parser.add_argument(
+        "--submission-filename",
+        default="submission_yolo26n_ensemble.csv",
+        help="Filename written under --output-dir for Kaggle predictions.",
+    )
     return parser.parse_args()
 
 
@@ -134,6 +148,8 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
         raise ValueError("--test-limit must be positive when provided.")
     if args.predict_batch <= 0:
         raise ValueError("--predict-batch must be positive.")
+    if not args.seeds:
+        raise ValueError("--seeds must contain at least one integer seed.")
 
     output_dir = args.output_dir.resolve()
     dataset_dir = output_dir / "dataset"
@@ -151,6 +167,7 @@ def build_config(args: argparse.Namespace) -> TrainConfig:
         project_dir=project_dir,
         model=resolve_model(args.model),
         run_name=args.name,
+        seeds=tuple(int(seed) for seed in args.seeds),
         epochs=args.epochs,
         batch=args.batch,
         imgsz=args.imgsz,
@@ -288,19 +305,17 @@ def render_prediction_image(image_array: np.ndarray, rgb: bool) -> Image.Image:
     return image.convert("RGB") if rgb else image
 
 
-def generate_submission(config: TrainConfig, best_model_path: Path) -> Path:
-    test_images, labels = load_digit_images(config.test_csv)
-    if labels is not None:
-        raise ValueError(f"{config.test_csv} should not contain a label column when generating a submission.")
+def predict_probabilities(
+    config: TrainConfig,
+    checkpoint_path: Path,
+    images: np.ndarray,
+) -> np.ndarray:
+    model = YOLO(str(checkpoint_path), task="classify")
+    probabilities: list[np.ndarray] = []
 
-    model = YOLO(str(best_model_path), task="classify")
-    predictions: list[int] = []
-
-    for start in range(0, len(test_images), config.predict_batch):
-        batch_images = [
-            render_prediction_image(image_array, rgb=config.rgb)
-            for image_array in test_images[start : start + config.predict_batch]
-        ]
+    for start in range(0, len(images), config.predict_batch):
+        batch_arrays = images[start : start + config.predict_batch]
+        batch_images = [render_prediction_image(image_array, rgb=config.rgb) for image_array in batch_arrays]
         batch_results = model.predict(
             source=batch_images,
             imgsz=config.imgsz,
@@ -308,7 +323,37 @@ def generate_submission(config: TrainConfig, best_model_path: Path) -> Path:
             device=config.device,
             verbose=False,
         )
-        predictions.extend(int(result.probs.top1) for result in batch_results)
+        probabilities.extend(result.probs.data.detach().cpu().numpy().astype(np.float32) for result in batch_results)
+
+    if len(probabilities) != len(images):
+        raise ValueError(
+            f"Prediction count mismatch for {checkpoint_path}: images={len(images)} probabilities={len(probabilities)}."
+        )
+    return np.stack(probabilities, axis=0)
+
+
+def ensemble_probabilities(
+    config: TrainConfig,
+    checkpoint_paths: list[Path],
+    images: np.ndarray,
+) -> np.ndarray:
+    ensemble = np.zeros((len(images), 10), dtype=np.float32)
+
+    for checkpoint_path in checkpoint_paths:
+        print(f"predict_checkpoint={checkpoint_path}")
+        ensemble += predict_probabilities(config, checkpoint_path=checkpoint_path, images=images)
+
+    ensemble /= float(len(checkpoint_paths))
+    return ensemble
+
+
+def generate_submission(config: TrainConfig, checkpoint_paths: list[Path]) -> Path:
+    test_images, labels = load_digit_images(config.test_csv)
+    if labels is not None:
+        raise ValueError(f"{config.test_csv} should not contain a label column when generating a submission.")
+
+    probabilities = ensemble_probabilities(config, checkpoint_paths=checkpoint_paths, images=test_images)
+    predictions = probabilities.argmax(axis=1).astype(np.int64)
 
     submission = pd.read_csv(config.sample_submission)
     if len(submission) != len(predictions):
@@ -325,11 +370,23 @@ def generate_submission(config: TrainConfig, best_model_path: Path) -> Path:
     return submission_path
 
 
-def train(config: TrainConfig, dataset_dir: Path) -> None:
-    print("training_config=")
-    print_config(config)
+def load_idx_test_split(config: TrainConfig) -> tuple[np.ndarray, np.ndarray]:
+    loader = MnistDataloader(
+        training_images_filepath=config.train_images,
+        training_labels_filepath=config.train_labels,
+        test_images_filepath=config.test_images,
+        test_labels_filepath=config.test_labels,
+    )
+    (_, _), (x_test, y_test) = loader.load_data(
+        train_limit=config.train_limit,
+        test_limit=config.test_limit,
+    )
+    return x_test, y_test
 
-    config.project_dir.mkdir(parents=True, exist_ok=True)
+
+def train_single_model(config: TrainConfig, dataset_dir: Path, seed: int) -> Path:
+    run_name = f"{config.run_name}-seed{seed}"
+    print(f"training_seed={seed}")
     model = YOLO(config.model, task="classify")
     results = model.train(
         data=str(dataset_dir),
@@ -340,8 +397,8 @@ def train(config: TrainConfig, dataset_dir: Path) -> None:
         device=config.device,
         workers=config.workers,
         project=str(config.project_dir),
-        name=config.run_name,
-        seed=config.seed,
+        name=run_name,
+        seed=seed,
         cache=config.cache,
         amp=config.amp,
         verbose=True,
@@ -356,21 +413,46 @@ def train(config: TrainConfig, dataset_dir: Path) -> None:
 
     results_dict = getattr(results, "results_dict", None)
     if isinstance(results_dict, dict) and results_dict:
-        print("train_metrics=")
+        print(f"train_metrics_seed_{seed}=")
         print(json.dumps(results_dict, ensure_ascii=False, indent=2))
 
     best_model_path = resolve_best_model_path(save_dir)
-    eval_model = YOLO(str(best_model_path), task="classify")
+    print(f"best_model_path_seed_{seed}={best_model_path}")
+    return best_model_path
+
+
+def evaluate_ensemble(config: TrainConfig, checkpoint_paths: list[Path]) -> None:
+    x_test, y_test = load_idx_test_split(config)
+    probabilities = ensemble_probabilities(config, checkpoint_paths=checkpoint_paths, images=x_test)
+    predictions = probabilities.argmax(axis=1)
+    accuracy = float((predictions == y_test).mean())
+
+    print("ensemble_test_metrics=")
+    print(
+        json.dumps(
+            {
+                "num_models": len(checkpoint_paths),
+                "seeds": list(config.seeds),
+                "accuracy": accuracy,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
+def train(config: TrainConfig, dataset_dir: Path) -> None:
+    print("training_config=")
+    print_config(config)
+
+    config.project_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_paths = [train_single_model(config, dataset_dir=dataset_dir, seed=seed) for seed in config.seeds]
 
     if config.test_after_train:
-        test_results = eval_model.val(data=str(dataset_dir), split="test", imgsz=config.imgsz, device=config.device)
-        test_metrics = getattr(test_results, "results_dict", None)
-        if isinstance(test_metrics, dict) and test_metrics:
-            print("test_metrics=")
-            print(json.dumps(test_metrics, ensure_ascii=False, indent=2))
+        evaluate_ensemble(config, checkpoint_paths=checkpoint_paths)
 
     if config.submission_after_train:
-        generate_submission(config, best_model_path=best_model_path)
+        generate_submission(config, checkpoint_paths=checkpoint_paths)
 
 
 def main() -> None:
