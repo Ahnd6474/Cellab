@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 모델 데이터 수집 & 예측 툴</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // --- 아이콘 컴포넌트 ---
+        const UploadIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+        const ImageIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+        const CheckCircle = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+        const Loader2 = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>;
+        const RotateCw = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
+        const FlipHorizontal = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 3 8 21"/><polyline points="16 3 16 21"/><path d="M12 3v18"/><path d="M3 12h5"/><path d="M16 12h5"/></svg>;
+        const Maximize = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>;
+        const Lightbulb = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>;
+        const SaveIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+        const SearchIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+
+        function App() {
+            // 현재 활성화된 탭 상태 ('upload' 또는 'predict')
+            const [activeTab, setActiveTab] = useState('upload');
+            
+            // --- [업로드 탭 상태] ---
+            const [className, setClassName] = useState('dog');
+            const CLASS_LABELS = { dog: '강아지 (dog)', cat: '고양이 (cat)', unknown: '기타/모름 (unknown)' };
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+            const [processLogs, setProcessLogs] = useState([]);
+            const [dataset, setDataset] = useState([]);
+            const fileInputRef = useRef(null);
+
+            // --- [예측 탭 상태] ---
+            const [predictImage, setPredictImage] = useState(null);
+            const [isPredicting, setIsPredicting] = useState(false);
+            const [predictResult, setPredictResult] = useState(null); // { class, confidence }
+            const predictFileInputRef = useRef(null);
+
+            // 내부 값은 영문, 화면 표시는 한글로 매핑
+            const CLASS_OPTIONS = [
+                { value: 'dog', label: CLASS_LABELS.dog },
+                { value: 'cat', label: CLASS_LABELS.cat },
+                { value: 'unknown', label: CLASS_LABELS.unknown }
+            ];
+
+            // 공통: 파일을 이미지 객체로 로드
+            const loadFileAsImage = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = reject;
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            // [클립보드 붙여넣기 기능] - 현재 활성화된 탭에 따라 다르게 작동
+            useEffect(() => {
+                const handlePaste = async (e) => {
+                    const items = e.clipboardData.items;
+                    let imageFile = null;
+                    
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) {
+                            const blob = items[i].getAsFile(); 
+                            imageFile = new File([blob], `clipboard_${Date.now()}.png`, { type: blob.type });
+                            break; // 첫 번째 이미지만 처리
+                        }
+                    }
+
+                    if (imageFile) {
+                        if (activeTab === 'upload' && !isProcessing) {
+                            processFiles([imageFile]);
+                        } else if (activeTab === 'predict' && !isPredicting) {
+                            handlePredictFileSelect([imageFile]);
+                        }
+                    }
+                };
+
+                window.addEventListener('paste', handlePaste);
+                return () => window.removeEventListener('paste', handlePaste);
+            }, [activeTab, isProcessing, isPredicting, className]); // 의존성에 탭 상태 추가
+
+
+            // ==========================================
+            // [업로드 탭] 기능 모음
+            // ==========================================
+            const addLog = (message) => setProcessLogs((prev) => [...prev, { id: Date.now() + Math.random(), message }]);
+            const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+            const processCenterCrop = (img, targetSize = 224) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = targetSize; canvas.height = targetSize;
+                const ctx = canvas.getContext('2d');
+                const scale = Math.max(targetSize / img.width, targetSize / img.height);
+                const scaledWidth = img.width * scale; const scaledHeight = img.height * scale;
+                const dx = (targetSize - scaledWidth) / 2; const dy = (targetSize - scaledHeight) / 2;
+                ctx.drawImage(img, 0, 0, img.width, img.height, dx, dy, scaledWidth, scaledHeight);
+                return canvas.toDataURL('image/jpeg', 0.9);
+            };
+
+            const processHorizontalFlip = (dataUrl) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.translate(img.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    };
+                    img.src = dataUrl;
+                });
+            };
+
+            const processRotate = (dataUrl, angleDeg) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const size = img.width; canvas.width = size; canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        ctx.translate(size / 2, size / 2); ctx.rotate((angleDeg * Math.PI) / 180); ctx.drawImage(img, -size / 2, -size / 2);
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    };
+                    img.src = dataUrl;
+                });
+            };
+
+            const processFiles = async (files) => {
+                if (files.length === 0) return;
+                setIsProcessing(true); setProcessLogs([]);
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    addLog(`[${file.name}] 분석 시작...`);
+                    await delay(300);
+                    try {
+                        const img = await loadFileAsImage(file);
+                        const baseCroppedUrl = processCenterCrop(img, 224);
+                        const baseId = Date.now() + '-base';
+                        setDataset(prev => [...prev, { id: baseId, className, type: '원본(크기조정)', dataUrl: baseCroppedUrl }]);
+                        
+                        const flippedUrl = await processHorizontalFlip(baseCroppedUrl);
+                        setDataset(prev => [...prev, { id: baseId + '-flip', className, type: '좌우 반전', dataUrl: flippedUrl }]);
+                        
+                        const rotatedUrl = await processRotate(baseCroppedUrl, 15);
+                        setDataset(prev => [...prev, { id: baseId + '-rot', className, type: '15도 회전', dataUrl: rotatedUrl }]);
+                        
+                        addLog(`✅ [${file.name}] 1장 -> 3장 증강 완료`);
+                    } catch (err) { addLog(`❌ [${file.name}] 처리 오류`); }
+                }
+                setIsProcessing(false); addLog('🎉 처리 완료! "PC에 저장하기"를 누르세요.');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            };
+
+            const saveToServer = async () => {
+                if (dataset.length === 0) return;
+                setIsSaving(true); addLog(`[서버 전송 중...]`);
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/upload', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: dataset })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        addLog(`✅ 저장 완료: ${result.message}`); alert(result.message); setDataset([]);
+                    } else throw new Error(result.detail);
+                } catch (error) {
+                    addLog(`❌ 서버 연결 실패`); alert("저장 실패: 서버를 확인하세요.");
+                } finally { setIsSaving(false); }
+            };
+
+            const groupedDataset = dataset.reduce((acc, curr) => {
+                if (!acc[curr.className]) acc[curr.className] = [];
+                acc[curr.className].push(curr); return acc;
+            }, {});
+
+
+            // ==========================================
+            // [예측 탭] 기능 모음
+            // ==========================================
+            const handlePredictFileSelect = async (files) => {
+                if (files.length === 0) return;
+                const file = files[0]; // 예측은 한 번에 한 장씩 수행
+                
+                try {
+                    // 화면에 보여주기 위해 Base64로 변환
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        setPredictImage(e.target.result);
+                        setPredictResult(null); // 새 이미지 등록 시 이전 결과 초기화
+                    };
+                    reader.readAsDataURL(file);
+                } catch (error) {
+                    alert("이미지를 읽는 중 오류가 발생했습니다.");
+                }
+            };
+
+            const runPrediction = async () => {
+                if (!predictImage) return;
+                setIsPredicting(true);
+                
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dataUrl: predictImage })
+                    });
+                    
+                    const result = await response.json();
+                    if (response.ok) {
+                        setPredictResult(result); // { class: '강아지', confidence: '95.50' }
+                    } else {
+                        throw new Error(result.detail || '예측 실패');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert("서버 통신 실패: 백엔드 서버가 실행 중인지 확인하세요.\n또는 모델 파일(my_custom_model.pth)이 존재하는지 확인하세요.");
+                } finally {
+                    setIsPredicting(false);
+                }
+            };
+
+            // ==========================================
+            // UI 렌더링
+            // ==========================================
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        
+                        {/* 헤더 */}
+                        <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                    <ImageIcon className="text-blue-500 w-6 h-6" />
+                                    AI 모델 데이터 수집 & 예측 툴
+                                </h1>
+                                <p className="text-gray-500 mt-1">이미지를 수집하여 학습하거나, 학습된 모델로 새로운 이미지를 판별합니다.</p>
+                            </div>
+                        </header>
+
+                        {/* 탭 내비게이션 */}
+                        <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                            <button
+                                onClick={() => setActiveTab('upload')}
+                                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2
+                                    ${activeTab === 'upload' ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <UploadIcon className="w-5 h-5" />
+                                1. 이미지 수집 (Data Upload)
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('predict')}
+                                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2
+                                    ${activeTab === 'predict' ? 'bg-green-50 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <SearchIcon className="w-5 h-5" />
+                                2. 모델 예측 (Inference)
+                            </button>
+                        </div>
+
+                        {/* --- 탭 내용 영역 --- */}
+                        {activeTab === 'upload' ? (
+                            // [탭 1] 이미지 수집 화면 (기존 코드)
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                                {/* 좌측 패널 */}
+                                <div className="lg:col-span-1 space-y-6">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                        <h2 className="text-lg font-semibold mb-4">1. 이미지 올리기</h2>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">정답 라벨 (클래스) 선택</label>
+                                            <select value={className} onChange={(e) => setClassName(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 bg-white" disabled={isProcessing}>
+                                                {CLASS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                            </select>
+                                        </div>
+                                        <div 
+                                            className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${isProcessing ? 'border-gray-300 bg-gray-50' : 'border-blue-300 bg-blue-50 hover:bg-blue-100 cursor-pointer'}`}
+                                            onClick={() => !isProcessing && fileInputRef.current?.click()}
+                                        >
+                                            {isProcessing ? (
+                                                <div className="flex flex-col items-center text-gray-500"><Loader2 className="w-10 h-10 animate-spin mb-2" /><span className="font-medium">데이터 처리 중...</span></div>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-blue-600"><UploadIcon className="w-10 h-10 mb-2" /><span className="font-medium">클릭하여 이미지 업로드</span><span className="text-xs text-blue-400 mt-1">또는 Ctrl+V 붙여넣기</span></div>
+                                            )}
+                                            <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => processFiles(Array.from(e.target.files))} disabled={isProcessing} />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                                        <h2 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-3"><Lightbulb className="w-5 h-5" />💡 좋은 데이터 수집 팁</h2>
+                                        <ul className="text-sm text-amber-700 space-y-2 list-disc list-inside">
+                                            <li><strong>클래스를 정확히 분리:</strong> 고양이, 강아지, 기타/모름 이미지를 섞지 말고 각각 올리세요.</li>
+                                            <li><strong>unknown에는 다른 대상:</strong> 사람, 새, 자동차, 빈 배경, 장난감처럼 고양이/강아지가 아닌 이미지를 모으세요.</li>
+                                            <li><strong>다양한 각도와 배경:</strong> 정면, 측면, 가까움, 멀음, 실내, 실외를 고르게 섞어 주세요.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="bg-gray-900 rounded-2xl p-6 shadow-sm flex flex-col h-64">
+                                        <h2 className="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2"><Loader2 className={`w-4 h-4 ${isProcessing ? 'animate-spin text-blue-400' : ''}`} />처리 상황 터미널</h2>
+                                        <div className="flex-1 overflow-y-auto space-y-2 font-mono text-sm">
+                                            {processLogs.map((log) => <div key={log.id} className="text-green-400"><span className="text-gray-500 mr-2">&gt;</span>{log.message}</div>)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 우측 패널 */}
+                                <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[600px]">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between mb-6 border-b pb-4">
+                                        <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 sm:mb-0"><CheckCircle className="text-green-500 w-5 h-5" />2. 증강된 데이터 확인</h2>
+                                        <button onClick={saveToServer} disabled={isSaving || dataset.length === 0} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors text-sm font-bold shadow-md">
+                                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <SaveIcon className="w-5 h-5" />}
+                                            {isSaving ? '저장 중...' : 'PC에 저장하기 (서버 전송)'}
+                                        </button>
+                                    </div>
+                                    {Object.keys(groupedDataset).length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-400 pt-20"><ImageIcon className="w-16 h-16 mb-4 opacity-20" /><p>아직 수집된 데이터가 없습니다.</p></div>
+                                    ) : (
+                                        <div className="space-y-8">
+                                            {Object.entries(groupedDataset).map(([cls, items]) => (
+                                                <div key={cls} className="space-y-3">
+                                                    <h3 className="text-md font-bold text-gray-800 flex items-center justify-between">
+                                                        <span>🏷️ 클래스: <span className="text-blue-600">{cls}</span></span>
+                                                        <span className="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{items.length}장</span>
+                                                    </h3>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                                        {items.map((item) => (
+                                                            <div key={item.id} className="group relative bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                                                <div className="relative aspect-square rounded-md overflow-hidden bg-gray-200 mb-2"><img src={item.dataUrl} className="w-full h-full object-cover" /></div>
+                                                                <div className="text-center text-[11px] text-gray-600 font-medium">{item.type}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                        ) : (
+
+                            // [탭 2] 이미지 예측 화면 (새로운 기능)
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in duration-300">
+                                <div className="max-w-2xl mx-auto space-y-8">
+                                    <div className="text-center">
+                                        <h2 className="text-2xl font-bold text-gray-800">새로운 이미지 판별하기</h2>
+                                        <p className="text-gray-500 mt-2">학습이 완료된 모델(`my_custom_model.pth`)을 사용하여 사진이 강아지, 고양이, 기타/모름 중 무엇인지 판별합니다.</p>
+                                    </div>
+
+                                    {/* 사진 업로드 영역 */}
+                                    <div 
+                                        className="border-2 border-dashed border-gray-300 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[300px] bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative overflow-hidden"
+                                        onClick={() => predictFileInputRef.current?.click()}
+                                    >
+                                        {predictImage ? (
+                                            <img src={predictImage} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2" />
+                                        ) : (
+                                            <div className="flex flex-col items-center text-gray-500">
+                                                <ImageIcon className="w-16 h-16 mb-4 text-gray-400" />
+                                                <span className="text-lg font-medium text-gray-700">클릭하여 테스트할 사진 선택</span>
+                                                <span className="text-sm mt-2">또는 Ctrl+V로 이미지 붙여넣기</span>
+                                            </div>
+                                        )}
+                                        <input type="file" accept="image/*" className="hidden" ref={predictFileInputRef} onChange={(e) => handlePredictFileSelect(Array.from(e.target.files))} />
+                                    </div>
+
+                                    {/* 예측 버튼 및 결과 표시 영역 */}
+                                    <div className="flex flex-col items-center space-y-6">
+                                        <button 
+                                            onClick={runPrediction}
+                                            disabled={!predictImage || isPredicting}
+                                            className="w-full max-w-sm flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-lg font-bold shadow-lg shadow-green-200"
+                                        >
+                                            {isPredicting ? <Loader2 className="w-6 h-6 animate-spin" /> : <SearchIcon className="w-6 h-6" />}
+                                            {isPredicting ? 'AI가 분석 중...' : '이 사진은 무엇일까요? (예측 실행)'}
+                                        </button>
+
+                                        {/* 결과 출력 */}
+                                        {predictResult && (
+                                            <div className="w-full max-w-md bg-green-50 border border-green-200 rounded-xl p-6 text-center animate-in slide-in-from-bottom-4 duration-500">
+                                                <p className="text-gray-500 text-sm font-medium mb-2">AI 모델의 판별 결과</p>
+                                                <div className="text-4xl font-black text-green-700 mb-3">
+                                                    {CLASS_LABELS[predictResult.class] || predictResult.class}
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-4 mb-1 overflow-hidden">
+                                                    <div className="bg-green-500 h-4 rounded-full transition-all duration-1000" style={{ width: `${predictResult.confidence}%` }}></div>
+                                                </div>
+                                                <p className="text-sm text-green-800 font-bold">확신도(Confidence): {predictResult.confidence}%</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

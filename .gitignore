@@ -5,7 +5,7 @@ __pycache__/
 *.pyc
 yolo11x-cls.pt
 yolo26x-cls.pt
-딥러닝/digit-recognizer/mnist_ensemble*/
+DL/digit-recognizer/mnist_ensemble*/
 
 .pytest_cache/
 .mypy_cache/

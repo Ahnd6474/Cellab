@@ -1,0 +1,124 @@
+사용 중인 기기: cuda:0
+원본 데이터 경로: /home/student_01/문서/GitHub/Cellab/DL/pretrain/dataset/train
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 334/334 [00:00<00:00, 13230.62it/s]
+ViT-MAE 증강 생성 시작: unknown -> 5000장
+  unknown: 100/5000
+  unknown: 200/5000
+  unknown: 300/5000
+  unknown: 400/5000
+  unknown: 500/5000
+  unknown: 600/5000
+  unknown: 700/5000
+  unknown: 800/5000
+  unknown: 900/5000
+  unknown: 1000/5000
+  unknown: 1100/5000
+  unknown: 1200/5000
+  unknown: 1300/5000
+  unknown: 1400/5000
+  unknown: 1500/5000
+  unknown: 1600/5000
+  unknown: 1700/5000
+  unknown: 1800/5000
+  unknown: 1900/5000
+  unknown: 2000/5000
+  unknown: 2100/5000
+  unknown: 2200/5000
+  unknown: 2300/5000
+  unknown: 2400/5000
+  unknown: 2500/5000
+  unknown: 2600/5000
+  unknown: 2700/5000
+  unknown: 2800/5000
+  unknown: 2900/5000
+  unknown: 3000/5000
+  unknown: 3100/5000
+  unknown: 3200/5000
+  unknown: 3300/5000
+  unknown: 3400/5000
+  unknown: 3500/5000
+  unknown: 3600/5000
+  unknown: 3700/5000
+  unknown: 3800/5000
+  unknown: 3900/5000
+  unknown: 4000/5000
+  unknown: 4100/5000
+  unknown: 4200/5000
+  unknown: 4300/5000
+  unknown: 4400/5000
+  unknown: 4500/5000
+  unknown: 4600/5000
+  unknown: 4700/5000
+  unknown: 4800/5000
+  unknown: 4900/5000
+  unknown: 5000/5000
+Fast image processor class <class 'transformers.models.vit.image_processing_vit_fast.ViTImageProcessorFast'> is available for this model. Using slow image processor class. To use the fast image processor class set `use_fast=True`.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+원본 클래스별 이미지 수: {'cat': 12499, 'dog': 12499, 'unknown': 1577}
+증강 클래스별 이미지 수: {'cat': 0, 'dog': 0, 'unknown': 5000}
+학습 클래스별 총 이미지 수: {'cat': 12499, 'dog': 12499, 'unknown': 6577}
+학습 데이터 총 개수: 31575
+Focal Loss alpha 가중치: {'cat': 0.7691, 'dog': 0.7691, 'unknown': 1.4617}
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 200/200 [00:00<00:00, 34269.99it/s]
+ViTForImageClassification LOAD REPORT from: facebook/deit-tiny-patch16-224
+Key               | Status   | Details
+------------------+----------+------------------------------------------------------------------------------------------
+classifier.weight | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([1000, 192]) vs model:torch.Size([3, 192])
+classifier.bias   | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([1000]) vs model:torch.Size([3])
+
+Notes:
+- MISMATCH      :ckpt weights were loaded, but they did not match the original empty weight shapes.
+Epoch 1/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0240 Acc: 0.9776\n
+Epoch 2/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0031 Acc: 0.9969\n
+Epoch 3/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0011 Acc: 0.9989\n
+Epoch 4/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0004 Acc: 0.9998\n
+Epoch 5/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0011 Acc: 0.9987\n
+Epoch 6/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0010 Acc: 0.9985\n
+Epoch 7/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0002 Acc: 0.9997\n
+Epoch 8/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0001 Acc: 0.9999\n
+Epoch 9/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0001 Acc: 0.9998\n
+Epoch 10/10
+----------
+/home/student_01/문서/GitHub/Cellab/.venv/lib/python3.13/site-packages/PIL/TiffImagePlugin.py:949: UserWarning: Truncated File Read
+  warnings.warn(str(msg))
+Train Loss: 0.0001 Acc: 0.9999\n
+학습 완료!
+Writing model shards: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:00<00:00, 33.41it/s]
+분류 모델이 저장되었습니다: /home/student_01/문서/GitHub/Cellab/DL/pretrain/classifier_model
+클래스 정보가 저장되었습니다: /home/student_01/문서/GitHub/Cellab/DL/pretrain/classes.json
