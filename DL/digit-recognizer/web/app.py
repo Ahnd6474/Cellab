@@ -2,41 +2,38 @@ from __future__ import annotations
 
 import base64
 import io
-import os
 from pathlib import Path
 
 import numpy as np
+import torch
 from flask import Flask, jsonify, render_template, request
 from PIL import Image
-from ultralytics import YOLO
-
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
-RUNS_DIR = PROJECT_ROOT / "mnist_yolo_cls" / "runs"
-DEFAULT_RUN_PREFIX = "mnist-yolo26n-ensemble-seed"
-DEFAULT_IMGSZ = 32
+MODEL_DIR = PROJECT_ROOT / "mnist_vit_cls" / "model"
+TRAIN_DTYPE = torch.float64
 
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=str(APP_DIR / "templates"))
 
-    model_paths = discover_model_paths()
-    models = [YOLO(str(model_path), task="classify") for model_path in model_paths]
-
-    app.config["ENSEMBLE_MODELS"] = models
-    app.config["ENSEMBLE_MODEL_PATHS"] = [str(path) for path in model_paths]
+    processor, model = load_model_bundle(MODEL_DIR)
+    app.config["MODEL_DIR"] = str(MODEL_DIR)
+    app.config["PROCESSOR"] = processor
+    app.config["MODEL"] = model
 
     @app.route("/")
     def index() -> str:
-        return render_template("index.html", model_paths=app.config["ENSEMBLE_MODEL_PATHS"])
+        return render_template("index.html", model_path=app.config["MODEL_DIR"])
 
     @app.route("/health", methods=["GET"])
     def health() -> tuple[dict[str, object], int]:
         return {
             "status": "ok",
-            "num_models": len(app.config["ENSEMBLE_MODELS"]),
-            "model_paths": app.config["ENSEMBLE_MODEL_PATHS"],
+            "model_dir": app.config["MODEL_DIR"],
+            "dtype": str(TRAIN_DTYPE),
         }, 200
 
     @app.route("/predict", methods=["POST"])
@@ -48,8 +45,9 @@ def create_app() -> Flask:
 
         try:
             image = preprocess_image(image_data)
-            probabilities = predict_ensemble(
-                models=app.config["ENSEMBLE_MODELS"],
+            probabilities = predict_probabilities(
+                processor=app.config["PROCESSOR"],
+                model=app.config["MODEL"],
                 image=image,
             )
         except Exception as exc:
@@ -60,29 +58,22 @@ def create_app() -> Flask:
             {
                 "result": prediction,
                 "probabilities": probabilities.tolist(),
-                "num_models": len(app.config["ENSEMBLE_MODELS"]),
+                "model_dir": app.config["MODEL_DIR"],
             }
         ), 200
 
     return app
 
 
-def discover_model_paths() -> list[Path]:
-    configured_paths = os.environ.get("DIGIT_ENSEMBLE_MODELS", "").strip()
-    if configured_paths:
-        paths = [Path(item).expanduser().resolve() for item in configured_paths.split(os.pathsep) if item.strip()]
-    else:
-        paths = sorted(RUNS_DIR.glob(f"{DEFAULT_RUN_PREFIX}*/weights/best.pt"))
+def load_model_bundle(model_dir: Path):
+    if not model_dir.exists():
+        raise FileNotFoundError(f"No ViT checkpoint found: {model_dir}")
 
-    if not paths:
-        raise FileNotFoundError(
-            "No ensemble checkpoints found. Train the ensemble first or set DIGIT_ENSEMBLE_MODELS."
-        )
-
-    missing = [str(path) for path in paths if not path.exists()]
-    if missing:
-        raise FileNotFoundError(f"Missing ensemble checkpoints: {missing}")
-    return paths
+    processor = AutoImageProcessor.from_pretrained(model_dir, use_fast=True)
+    model = AutoModelForImageClassification.from_pretrained(model_dir)
+    model = model.to(dtype=TRAIN_DTYPE)
+    model.eval()
+    return processor, model
 
 
 def preprocess_image(image_data: str) -> Image.Image:
@@ -96,17 +87,13 @@ def preprocess_image(image_data: str) -> Image.Image:
     return image.convert("RGB")
 
 
-def predict_ensemble(models: list[YOLO], image: Image.Image) -> np.ndarray:
-    if not models:
-        raise ValueError("No models are loaded.")
-
-    ensemble = np.zeros(10, dtype=np.float32)
-    for model in models:
-        results = model.predict(source=[image], imgsz=DEFAULT_IMGSZ, batch=1, device="cpu", verbose=False)
-        probs = results[0].probs.data.detach().cpu().numpy().astype(np.float32)
-        ensemble += probs
-    ensemble /= float(len(models))
-    return ensemble
+def predict_probabilities(processor, model, image: Image.Image) -> np.ndarray:
+    inputs = processor(images=image, return_tensors="pt")
+    pixel_values = inputs["pixel_values"].to(dtype=TRAIN_DTYPE)
+    with torch.no_grad():
+        logits = model(pixel_values=pixel_values).logits
+        probs = torch.softmax(logits, dim=1)
+    return probs[0].cpu().numpy().astype(np.float64)
 
 
 app = create_app()
