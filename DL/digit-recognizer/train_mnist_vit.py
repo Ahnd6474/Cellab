@@ -20,7 +20,7 @@ from transformers import AutoImageProcessor, AutoModelForImageClassification
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_MODEL_NAME = "facebook/deit-small-patch16-224"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "mnist_vit_cls"
-DEFAULT_EPOCHS = 12
+DEFAULT_EPOCHS = 30
 DEFAULT_BATCH = 64
 DEFAULT_BACKBONE_LR = 1e-5
 DEFAULT_HEAD_LR = 5e-5

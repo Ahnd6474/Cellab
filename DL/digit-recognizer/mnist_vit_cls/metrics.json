@@ -1,0 +1,9 @@
+{
+  "model_name": "facebook/deit-small-patch16-224",
+  "train_dtype": "torch.float32",
+  "best_val_loss": 0.007151653907304058,
+  "submission_path": "/home/student_01/문서/GitHub/Cellab/DL/digit-recognizer/mnist_vit_cls/submission_vit.csv",
+  "model_dir": "/home/student_01/문서/GitHub/Cellab/DL/digit-recognizer/mnist_vit_cls/model",
+  "num_train": 37800,
+  "num_val": 4200
+}
