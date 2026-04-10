@@ -61,7 +61,7 @@ ViT 실험은 첫 번째 출처의 `train.csv`를 사용했고, YOLO classificat
 
 Vision Transformer(ViT)는 이미지를 patch 단위로 나눈 뒤, 각 patch를 토큰처럼 다루는 분류 모델이다. 본 실험에서는 `facebook/deit-small-patch16-224`를 MNIST에 맞게 미세조정했다.
 
-<img src="./figures/vision_transformer_architecture.png" alt="Vision Transformer architecture" width="900" />
+<img src="./figures/vision_transformer_architecture.png" alt="Vision Transformer architecture" width="780" />
 
 그림 2. Vision Transformer의 기본 구조. 입력 이미지를 patch 단위로 분할하고, patch embedding과 positional embedding을 더한 뒤 Transformer encoder를 거쳐 최종 분류를 수행한다.
 
