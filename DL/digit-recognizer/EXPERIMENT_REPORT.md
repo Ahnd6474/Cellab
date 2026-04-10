@@ -61,7 +61,7 @@ ViT 실험은 첫 번째 출처의 `train.csv`를 사용했고, YOLO classificat
 
 Vision Transformer(ViT)는 이미지를 patch 단위로 나눈 뒤, 각 patch를 토큰처럼 다루는 분류 모델이다. 본 실험에서는 `facebook/deit-small-patch16-224`를 MNIST에 맞게 미세조정했다.
 
-<img src="./figures/vision_transformer_architecture.png" alt="Vision Transformer architecture" width="700" />
+<img src="./figures/vision_transformer_architecture.png" alt="Vision Transformer architecture" width="900" />
 
 그림 2. Vision Transformer의 기본 구조. 입력 이미지를 patch 단위로 분할하고, patch embedding과 positional embedding을 더한 뒤 Transformer encoder를 거쳐 최종 분류를 수행한다.
 
@@ -151,7 +151,7 @@ ViT 쪽에서 현재 확인 가능한 대표 수치는 다음과 같다.
 | 11 | `0.00053` | `0.99937` | `0.00715` | `0.99548` |
 | 12 | `0.00021` | `0.99979` | `0.01629` | `0.99024` |
 
-<img src="./figures/vit_training_curves.png" alt="ViT training curves" width="700" />
+<img src="./figures/vit_training_curves.png" alt="ViT training curves" width="900" />
 
 그림 3. ViT 학습 곡선. 왼쪽은 train/validation loss, 오른쪽은 train/validation accuracy다. epoch 11에서 validation 성능이 가장 좋고, epoch 12에서는 train 성능이 더 올라가지만 validation 성능은 다시 내려간다.
 
