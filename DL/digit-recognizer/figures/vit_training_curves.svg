@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="310" viewBox="0 0 920 310" role="img" aria-labelledby="title desc">
+  <title id="title">ViT Training Curves</title>
+  <desc id="desc">Line charts showing ViT train and validation loss, and train and validation accuracy across 12 epochs.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .panel { fill: #fafafa; stroke: #d0d7de; stroke-width: 1; }
+    .grid { stroke: #e5e7eb; stroke-width: 1; }
+    .axis { stroke: #6b7280; stroke-width: 1.2; }
+    .label { fill: #374151; font-family: Arial, sans-serif; font-size: 12px; }
+    .title { fill: #111827; font-family: Arial, sans-serif; font-size: 18px; font-weight: 700; }
+    .subtitle { fill: #111827; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; }
+    .legend { fill: #374151; font-family: Arial, sans-serif; font-size: 12px; }
+    .train { fill: none; stroke: #2563eb; stroke-width: 2.5; }
+    .val { fill: none; stroke: #dc2626; stroke-width: 2.5; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="920" height="310" />
+  <text class="title" x="40" y="32">ViT Training Curves</text>
+
+  <rect class="panel" x="40" y="40" width="400" height="220" rx="8" />
+  <rect class="panel" x="470" y="40" width="400" height="220" rx="8" />
+
+  <text class="subtitle" x="70" y="60">Loss</text>
+  <text class="subtitle" x="500" y="60">Accuracy</text>
+
+  <line class="grid" x1="70" y1="220" x2="410" y2="220" />
+  <line class="grid" x1="70" y1="183.1" x2="410" y2="183.1" />
+  <line class="grid" x1="70" y1="146.2" x2="410" y2="146.2" />
+  <line class="grid" x1="70" y1="109.2" x2="410" y2="109.2" />
+  <line class="grid" x1="70" y1="72.3" x2="410" y2="72.3" />
+
+  <line class="grid" x1="500" y1="220" x2="840" y2="220" />
+  <line class="grid" x1="500" y1="188" x2="840" y2="188" />
+  <line class="grid" x1="500" y1="156" x2="840" y2="156" />
+  <line class="grid" x1="500" y1="124" x2="840" y2="124" />
+  <line class="grid" x1="500" y1="92" x2="840" y2="92" />
+  <line class="grid" x1="500" y1="60" x2="840" y2="60" />
+
+  <line class="axis" x1="70" y1="60" x2="70" y2="220" />
+  <line class="axis" x1="70" y1="220" x2="410" y2="220" />
+  <line class="axis" x1="500" y1="60" x2="500" y2="220" />
+  <line class="axis" x1="500" y1="220" x2="840" y2="220" />
+
+  <text class="label" x="43" y="224">0.00</text>
+  <text class="label" x="43" y="187">0.03</text>
+  <text class="label" x="43" y="150">0.06</text>
+  <text class="label" x="43" y="113">0.09</text>
+  <text class="label" x="43" y="76">0.12</text>
+
+  <text class="label" x="468" y="224">0.95</text>
+  <text class="label" x="468" y="192">0.96</text>
+  <text class="label" x="468" y="160">0.97</text>
+  <text class="label" x="468" y="128">0.98</text>
+  <text class="label" x="468" y="96">0.99</text>
+  <text class="label" x="468" y="64">1.00</text>
+
+  <text class="label" x="66" y="244">1</text>
+  <text class="label" x="96" y="244">2</text>
+  <text class="label" x="127" y="244">3</text>
+  <text class="label" x="158" y="244">4</text>
+  <text class="label" x="189" y="244">5</text>
+  <text class="label" x="220" y="244">6</text>
+  <text class="label" x="251" y="244">7</text>
+  <text class="label" x="282" y="244">8</text>
+  <text class="label" x="313" y="244">9</text>
+  <text class="label" x="340" y="244">10</text>
+  <text class="label" x="371" y="244">11</text>
+  <text class="label" x="402" y="244">12</text>
+
+  <text class="label" x="496" y="244">1</text>
+  <text class="label" x="526" y="244">2</text>
+  <text class="label" x="557" y="244">3</text>
+  <text class="label" x="588" y="244">4</text>
+  <text class="label" x="619" y="244">5</text>
+  <text class="label" x="650" y="244">6</text>
+  <text class="label" x="681" y="244">7</text>
+  <text class="label" x="712" y="244">8</text>
+  <text class="label" x="743" y="244">9</text>
+  <text class="label" x="770" y="244">10</text>
+  <text class="label" x="801" y="244">11</text>
+  <text class="label" x="832" y="244">12</text>
+
+  <text class="label" x="227" y="272">Epoch</text>
+  <text class="label" x="657" y="272">Epoch</text>
+
+  <polyline class="train" points="70.0,66.6 100.9,204.8 131.8,213.0 162.7,215.5 193.6,216.0 224.5,217.8 255.5,219.3 286.4,219.4 317.3,217.8 348.2,216.0 379.1,219.3 410.0,219.7" />
+  <polyline class="val" points="70.0,195.9 100.9,205.4 131.8,205.9 162.7,196.9 193.6,204.8 224.5,204.6 255.5,207.5 286.4,205.2 317.3,194.0 348.2,204.6 379.1,211.2 410.0,200.0" />
+
+  <polyline class="train" points="500.0,219.3 530.9,85.7 561.8,72.7 592.7,68.7 623.6,68.1 654.5,64.6 685.5,61.3 716.4,61.3 747.3,64.2 778.2,68.6 809.1,62.0 840.0,60.7" />
+  <polyline class="val" points="500.0,102.7 530.9,80.6 561.8,84.4 592.7,95.8 623.6,83.6 654.5,81.3 685.5,79.8 716.4,79.0 747.3,98.8 778.2,81.3 809.1,74.5 840.0,91.2" />
+
+  <line class="train" x1="700" y1="24" x2="730" y2="24" />
+  <text class="legend" x="738" y="28">Train</text>
+  <line class="val" x1="790" y1="24" x2="820" y2="24" />
+  <text class="legend" x="828" y="28">Validation</text>
+</svg>

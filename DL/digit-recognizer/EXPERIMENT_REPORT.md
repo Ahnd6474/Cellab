@@ -157,6 +157,10 @@ ViT 쪽에서 현재 확인 가능한 대표 수치는 다음과 같다.
 | 11 | `0.00053` | `0.99937` | `0.00715` | `0.99548` |
 | 12 | `0.00021` | `0.99979` | `0.01629` | `0.99024` |
 
+![ViT training curves](./figures/vit_training_curves.svg)
+
+그림 3. ViT 학습 곡선. 왼쪽은 train/validation loss, 오른쪽은 train/validation accuracy다. epoch 11에서 validation 성능이 가장 좋고, epoch 12에서는 train 성능이 더 올라가지만 validation 성능은 다시 내려간다.
+
 아쉬운 점도 있다. 저장소에는 ViT confusion matrix나 오분류 예시 같은 후속 산출물이 남아 있지 않다. 그래서 숫자 자체는 좋지만, 어떤 클래스에서 흔들렸는지까지는 지금 문서에서 보여주지 못한다.
 
 ### YOLO classification 결과
@@ -182,11 +186,11 @@ ViT 쪽에서 현재 확인 가능한 대표 수치는 다음과 같다.
 
 ![YOLO seed72 training curves](./yolo/mnist_yolo_cls/runs/mnist-yolo26n-ensemble-seed72/results.png)
 
-그림 3. YOLO classification `seed72` 실험의 학습 곡선. train loss와 validation loss가 전반적으로 안정적으로 내려가고, top-1 accuracy는 약 0.99 수준까지 수렴한다.
+그림 4. YOLO classification `seed72` 실험의 학습 곡선. train loss와 validation loss가 전반적으로 안정적으로 내려가고, top-1 accuracy는 약 0.99 수준까지 수렴한다.
 
 ![YOLO seed72 normalized confusion matrix](./yolo/mnist_yolo_cls/runs/mnist-yolo26n-ensemble-seed72/confusion_matrix_normalized.png)
 
-그림 4. YOLO classification `seed72` 실험의 정규화 confusion matrix. 대부분 클래스에서 예측이 대각선에 모여 있고, 일부 비슷한 숫자 쌍에서만 제한적인 혼동이 보인다.
+그림 5. YOLO classification `seed72` 실험의 정규화 confusion matrix. 대부분 클래스에서 예측이 대각선에 모여 있고, 일부 비슷한 숫자 쌍에서만 제한적인 혼동이 보인다.
 
 ## 해석
 
