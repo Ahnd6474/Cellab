@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MNIST Experiment Report</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    body {
+      font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+      color: #111827;
+      line-height: 1.6;
+      font-size: 11pt;
+      word-break: keep-all;
+    }
+    main {
+      max-width: 100%;
+    }
+    h1, h2, h3 {
+      color: #111827;
+      page-break-after: avoid;
+      margin-top: 1.4em;
+      margin-bottom: 0.5em;
+    }
+    h1 {
+      font-size: 24pt;
+      border-bottom: 2px solid #d1d5db;
+      padding-bottom: 0.25em;
+    }
+    h2 {
+      font-size: 17pt;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 0.2em;
+    }
+    h3 {
+      font-size: 13pt;
+    }
+    p, li {
+      margin: 0.45em 0;
+    }
+    ul, ol {
+      padding-left: 1.5em;
+      margin: 0.4em 0 0.8em;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      background: #f3f4f6;
+      border-radius: 4px;
+      padding: 0.08em 0.3em;
+      font-size: 0.95em;
+    }
+    a {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.8em 0 1.1em;
+      font-size: 10pt;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px 9px;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+      text-align: left;
+    }
+    tr:nth-child(even) td {
+      background: #fafafa;
+    }
+    .figure {
+      text-align: center;
+      margin: 0.9em 0 0.5em;
+      page-break-inside: avoid;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1 id="mnist-데이터셋-실험-보고서">MNIST 데이터셋 실험 보고서</h1>
+<p>MNIST 손글씨 숫자 분류 문제에서 두 가지 경로를 비교한 기록이다.&lt;br&gt; 관심사는 코드 구현 자체보다, 어떤 접근이 실제로 어떤 성능을 냈고 그 결과를 어디까지 믿을 수 있는지에 있다.</p>
+<h2 id="목차">목차</h2>
+<ul>
+<li><a href="#보고서-범위">보고서 범위</a></li>
+<li><a href="#데이터와-비교-조건">데이터와 비교 조건</a>
+<ul>
+<li></li>
+<li><a href="#데이터-출처">데이터 출처</a></li>
+<li><a href="#비교-조건">비교 조건</a></li></ul>
+</li>
+<li><a href="#접근-개요">접근 개요</a>
+<ul>
+<li></li>
+<li><a href="#vision-transformer">Vision Transformer</a></li>
+<li><a href="#yolo-classification">YOLO classification</a></li></ul>
+</li>
+<li><a href="#실험-설정">실험 설정</a>
+<ul>
+<li></li>
+<li><a href="#vit-전이학습">ViT 전이학습</a></li>
+<li><a href="#yolo-classification-반복-실험">YOLO classification 반복 실험</a></li></ul>
+</li>
+<li><a href="#실험-결과">실험 결과</a>
+<ul>
+<li></li>
+<li><a href="#모델-간-요약">모델 간 요약</a></li>
+<li><a href="#vit-결과">ViT 결과</a></li>
+<li><a href="#yolo-classification-결과">YOLO classification 결과</a></li></ul>
+</li>
+<li><a href="#해석">해석</a></li>
+<li><a href="#한계">한계</a></li>
+<li><a href="#결론">결론</a></li>
+<li><a href="#참고-문헌-및-그림-출처">참고 문헌 및 그림 출처</a></li></ul>
+<h2 id="보고서-범위">보고서 범위</h2>
+<p>이 보고서는 MNIST 손글씨 숫자 분류 문제에 대해 수행한 두 가지 실험 경로만 다룬다.</p>
+<ul>
+<li>ViT 기반 전이학습</li>
+<li>YOLO classification 기반 분류</li></ul>
+<p>비교의 핵심은 다음 두 가지다.</p>
+<ul>
+<li>ViT 단일 run이 어느 정도까지 올라갔는가</li>
+<li>YOLO classification이 반복 실험에서도 비슷한 성능을 유지하는가</li></ul>
+<h2 id="데이터와-비교-조건">데이터와 비교 조건</h2>
+<h3 id="데이터-출처">데이터 출처</h3>
+<p>본 보고서에서 참조한 공개 데이터 출처는 다음과 같다.</p>
+<ol>
+<li><a href="https://www.kaggle.com/competitions/digit-recognizer">Kaggle Digit Recognizer Competition</a></li>
+<li><a href="https://www.kaggle.com/datasets/hojjatk/mnist-dataset">MNIST Dataset (Kaggle mirror)</a></li></ol>
+<p>ViT 실험은 첫 번째 출처의 <code>train.csv</code>를 사용했고, YOLO classification 실험은 두 번째 출처와 같은 MNIST IDX 형식을 사용했다.</p>
+<div class="figure"><img src="./sample_digit.png" alt="MNIST sample digit" width="260" /></div>
+<p>그림 1. MNIST 입력 샘플. 이 실험은 저해상도 grayscale 숫자 영상을 0부터 9까지의 클래스로 분류하는 문제를 다룬다.</p>
+<h3 id="비교-조건">비교 조건</h3>
+<p>두 실험은 모두 같은 문제를 푼다. 다만 실험 조건은 완전히 같지 않다. 같은 데이터를 사용하지만, 다른 스필릿을 사용했다. 그래서 이 문서의 비교는 "같은 문제를 어떤 방식으로 풀었는가"를 보는 비교이지, 같은 데이터 분할 위에서 측정한 엄밀한 리더보드는 아니다.</p>
+<h2 id="접근-개요">접근 개요</h2>
+<h3 id="vision-transformer">Vision Transformer</h3>
+<p>Vision Transformer(ViT)는 이미지를 patch 단위로 나눈 뒤, 각 patch를 토큰처럼 다루는 분류 모델이다. 본 실험에서는 <code>facebook/deit-small-patch16-224</code>를 MNIST에 맞게 미세조정했다.</p>
+<div class="figure"><img src="./figures/vision_transformer_architecture.png" alt="Vision Transformer architecture" width="780" /></div>
+<p>그림 2. Vision Transformer의 기본 구조. 입력 이미지를 patch 단위로 분할하고, patch embedding과 positional embedding을 더한 뒤 Transformer encoder를 거쳐 최종 분류를 수행한다.</p>
+<p>ViT는 전역 문맥을 한 번에 본다는 장점이 있다. 대신 MNIST처럼 작은 입력에서는 28x28 이미지를 224x224로 키워 넣는 비용이 꽤 크다. 잘 맞으면 성능은 높게 나올 수 있지만, 계산량이 가벼운 쪽은 아니다.</p>
+<h3 id="yolo-classification">YOLO classification</h3>
+<p>본 실험에서 사용한 <code>yolo26n-cls.pt</code>는 Ultralytics의 classification 전용 분기다. 입력 이미지 전체에 대해 단일 class label과 confidence score를 출력한다.</p>
+<p>MNIST처럼 이미지 하나에 숫자 하나가 들어 있는 문제에서는 이런 분류 설정이 단순하다. 반복 실험을 돌려서 안정성을 보기도 쉽다.</p>
+<h2 id="실험-설정">실험 설정</h2>
+<h3 id="vit-전이학습">ViT 전이학습</h3>
+<p>ViT 경로는 <code>facebook/deit-small-patch16-224</code>를 MNIST 분류에 맞게 파인튜닝하는 방식이다.</p>
+<ul>
+<li>입력 데이터: Kaggle Digit Recognizer 형식의 <code>train.csv</code></li>
+<li>학습/검증 분할: <code>37,800 / 4,200</code></li>
+<li>원본 CSV 크기: <code>42,000</code> labeled train rows, <code>28,000</code> unlabeled test rows</li>
+<li>28x28 grayscale 이미지를 RGB로 변환</li>
+<li>Hugging Face <code>AutoImageProcessor</code>, <code>AutoModelForImageClassification</code> 사용</li>
+<li>backbone과 classifier head에 서로 다른 learning rate 적용</li>
+<li>focal loss와 클래스 가중치 사용</li>
+<li>validation loss 기준 early stopping 적용</li></ul>
+<h3 id="yolo-classification-반복-실험">YOLO classification 반복 실험</h3>
+<p>YOLO 쪽에서 실제 결과가 남아 있는 실험은 classification 경로다.</p>
+<ul>
+<li>입력 데이터: raw MNIST IDX</li>
+<li>학습/검증/테스트 분할: <code>54,000 / 6,000 / 10,000</code></li>
+<li>총 사용 라벨 데이터: <code>60,000 train + 10,000 test</code></li>
+<li>모델: <code>yolo26n-cls.pt</code></li>
+<li>epochs: <code>30</code></li>
+<li>batch: <code>128</code></li>
+<li>image size: <code>32</code></li>
+<li>patience: <code>10</code></li>
+<li>pretrained: <code>true</code></li></ul>
+<p>반복 실행된 run은 다음 네 개다.</p>
+<ul>
+<li><code>mnist-yolo26n-ensemble-seed42</code></li>
+<li><code>mnist-yolo26n-ensemble-seed52</code></li>
+<li><code>mnist-yolo26n-ensemble-seed62</code></li>
+<li><code>mnist-yolo26n-ensemble-seed72</code></li></ul>
+<h2 id="실험-결과">실험 결과</h2>
+<h3 id="모델-간-요약">모델 간 요약</h3>
+<p>표 1은 두 접근의 핵심 결과를 접근별로 정리한 것이다.</p>
+<p>표 1. 모델 간 핵심 결과 요약.</p>
+<table>
+<thead>
+<tr><th>접근</th><th>현재 확인 가능한 핵심 결과</th><th>해석</th></tr>
+</thead>
+<tbody>
+<tr><td>ViT 전이학습</td><td><code>best_val_loss = 0.0071516539</code>, <code>best_val_acc = 0.99548</code></td><td>단일 run 기준으로는 강한 성능이 나왔지만 반복 검증은 아직 없다</td></tr>
+<tr><td>YOLO classification</td><td>최고 top-1 <code>0.99017</code>, 평균 <code>0.989585</code></td><td>최고점은 ViT보다 낮지만 반복 실험 기준으로는 가장 안정적이다</td></tr>
+</tbody>
+</table>
+<h3 id="vit-결과">ViT 결과</h3>
+<p>ViT 쪽에서 현재 확인 가능한 대표 수치는 다음과 같다.</p>
+<ul>
+<li>모델: <code>facebook/deit-small-patch16-224</code></li>
+<li>best validation loss: <code>0.0071516539</code></li>
+<li>best validation accuracy: <code>0.99548</code></li>
+<li>best epoch: <code>11 / 12</code></li>
+<li>train/val split: <code>37,800 / 4,200</code></li></ul>
+<p>학습 기록을 보면 초반 수렴이 빠르고, epoch 11에서 검증 성능이 가장 좋다. epoch 12에서는 train loss는 더 내려가지만 validation 성능은 다시 떨어져서, best checkpoint가 어느 지점인지도 비교적 분명하다.</p>
+<p>표 2. ViT epoch별 학습 기록.</p>
+<table>
+<thead>
+<tr><th>Epoch</th><th>Train Loss</th><th>Train Acc</th><th>Val Loss</th><th>Val Acc</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><code>0.12462</code></td><td><code>0.95021</code></td><td><code>0.01961</code></td><td><code>0.98667</code></td></tr>
+<tr><td>2</td><td><code>0.01231</code></td><td><code>0.99196</code></td><td><code>0.01189</code></td><td><code>0.99357</code></td></tr>
+<tr><td>3</td><td><code>0.00569</code></td><td><code>0.99603</code></td><td><code>0.01147</code></td><td><code>0.99238</code></td></tr>
+<tr><td>4</td><td><code>0.00363</code></td><td><code>0.99728</code></td><td><code>0.01875</code></td><td><code>0.98881</code></td></tr>
+<tr><td>5</td><td><code>0.00321</code></td><td><code>0.99746</code></td><td><code>0.01235</code></td><td><code>0.99262</code></td></tr>
+<tr><td>6</td><td><code>0.00181</code></td><td><code>0.99857</code></td><td><code>0.01248</code></td><td><code>0.99333</code></td></tr>
+<tr><td>7</td><td><code>0.00054</code></td><td><code>0.99960</code></td><td><code>0.01015</code></td><td><code>0.99381</code></td></tr>
+<tr><td>8</td><td><code>0.00046</code></td><td><code>0.99958</code></td><td><code>0.01201</code></td><td><code>0.99405</code></td></tr>
+<tr><td>9</td><td><code>0.00175</code></td><td><code>0.99868</code></td><td><code>0.02113</code></td><td><code>0.98786</code></td></tr>
+<tr><td>10</td><td><code>0.00322</code></td><td><code>0.99730</code></td><td><code>0.01250</code></td><td><code>0.99333</code></td></tr>
+<tr><td>11</td><td><code>0.00053</code></td><td><code>0.99937</code></td><td><code>0.00715</code></td><td><code>0.99548</code></td></tr>
+<tr><td>12</td><td><code>0.00021</code></td><td><code>0.99979</code></td><td><code>0.01629</code></td><td><code>0.99024</code></td></tr>
+</tbody>
+</table>
+<div class="figure"><img src="./figures/vit_training_curves.png" alt="ViT training curves" width="900" /></div>
+<p>그림 3. ViT 학습 곡선. 왼쪽은 train/validation loss, 오른쪽은 train/validation accuracy다. epoch 11에서 validation 성능이 가장 좋고, epoch 12에서는 train 성능이 더 올라가지만 validation 성능은 다시 내려간다.</p>
+<p>아쉬운 점도 있다. ViT 실험 결과에는 혼동행렬이나 오분류 예시 같은 후속 분석이 포함되어 있지 않다. 그래서 숫자 자체는 좋지만, 어떤 클래스에서 흔들렸는지까지는 이 보고서에서 보여주지 못한다.</p>
+<h3 id="yolo-classification-결과">YOLO classification 결과</h3>
+<p>표 3은 YOLO classification 반복 실험의 seed별 성능을 비교한 결과다.</p>
+<p>표 3. YOLO classification 반복 실험의 seed별 성능 비교.</p>
+<table>
+<thead>
+<tr><th>Seed</th><th>최고 Top-1 Accuracy</th><th>Top-1 최고 Epoch</th><th>최소 Validation Loss</th><th>최소 Loss Epoch</th></tr>
+</thead>
+<tbody>
+<tr><td>42</td><td><code>0.98917</code></td><td><code>24</code></td><td><code>0.03544</code></td><td><code>30</code></td></tr>
+<tr><td>52</td><td><code>0.98967</code></td><td><code>28</code></td><td><code>0.03198</code></td><td><code>27</code></td></tr>
+<tr><td>62</td><td><code>0.98933</code></td><td><code>29</code></td><td><code>0.03246</code></td><td><code>30</code></td></tr>
+<tr><td>72</td><td><code>0.99017</code></td><td><code>30</code></td><td><code>0.03183</code></td><td><code>30</code></td></tr>
+</tbody>
+</table>
+<p>요약 통계는 다음과 같다.</p>
+<ul>
+<li>평균 top-1 accuracy: <code>0.989585</code></li>
+<li>top-1 accuracy 표준편차: <code>0.000383</code></li>
+<li>평균 최소 validation loss: <code>0.0329275</code></li></ul>
+<p>이 수치가 말해주는 건 단순하다. YOLO classification은 한 번만 잘 나온 결과가 아니다. seed를 바꿔도 비슷한 범위에 머문다. 이 점이 이 모델을 이번 비교에서 가장 믿기 쉬운 기준선으로 만든다.</p>
+<div class="figure"><img src="./yolo/mnist_yolo_cls/runs/mnist-yolo26n-ensemble-seed72/results.png" alt="YOLO seed72 training curves" width="620" /></div>
+<p>그림 4. YOLO classification <code>seed72</code> 실험의 학습 곡선. train loss와 validation loss가 전반적으로 안정적으로 내려가고, top-1 accuracy는 약 0.99 수준까지 수렴한다.</p>
+<div class="figure"><img src="./yolo/mnist_yolo_cls/runs/mnist-yolo26n-ensemble-seed72/confusion_matrix_normalized.png" alt="YOLO seed72 normalized confusion matrix" width="700" /></div>
+<p>그림 5. YOLO classification <code>seed72</code> 실험의 정규화 혼동행렬. 대부분 클래스에서 예측이 대각선에 모여 있고, 일부 비슷한 숫자 쌍에서만 제한적인 혼동이 보인다.</p>
+<h2 id="해석">해석</h2>
+<p>이 문서에서 읽어야 할 포인트는 둘이다.</p>
+<p>첫째, 단일 최고 성능만 보면 ViT가 더 높다. 이번 실험에서 확보된 수치 기준으로 ViT의 best validation accuracy는 <code>0.99548</code>이고, YOLO classification의 최고 top-1 accuracy는 <code>0.99017</code>이다. 다만 두 실험은 데이터 분할과 평가 절차가 완전히 같지 않으므로, 이 숫자를 같은 리더보드에서 직접 비교한 결과처럼 읽으면 안 된다.</p>
+<p>둘째, 반복 안정성까지 포함하면 YOLO classification의 해석이 더 단단하다. YOLO는 seed를 바꾼 네 번의 실험에서 top-1 accuracy가 <code>0.98917</code>에서 <code>0.99017</code> 사이에 모였고, 최소 validation loss도 <code>0.03183</code>에서 <code>0.03544</code> 범위에 머물렀다. 반면 ViT는 단일 run 기준 최고 성능은 높지만, 같은 설정을 반복했을 때 비슷한 결과가 재현되는지는 아직 확인되지 않았다.</p>
+<p>ViT 쪽의 계산 비용도 함께 봐야 한다. 현재 코드 경로는 28x28 grayscale 이미지를 RGB로 바꾸고, <code>facebook/deit-small-patch16-224</code> 계열 입력 규격에 맞게 224x224로 올려서 사용한다. 이 방식은 MNIST 같은 저해상도 데이터에도 성능상 이점을 줄 수 있지만, 원본 해상도 대비 입력 확대가 크기 때문에 계산량과 표현 낭비가 생긴다. 따라서 현재 결과는 "ViT가 MNIST에서 단일 run 최고 정확도를 낼 수 있다"는 근거로는 충분하지만, "MNIST에 가장 효율적인 선택"이라는 뜻으로 해석할 단계는 아니다.</p>
+<h2 id="한계">한계</h2>
+<p>이 보고서는 이번 실험에서 확보한 결과와 지표를 바탕으로 정리했다. 그래서 다음 한계가 남아 있다.</p>
+<ul>
+<li>ViT와 YOLO classification은 같은 문제를 풀지만, 동일한 train/validation/test 분할 위에서 정면 비교한 실험은 아니다.</li>
+<li>ViT 경로는 단일 run 결과만 남아 있어, seed 변화에 따른 분산이나 재현성을 평가할 수 없다.</li>
+<li>ViT 쪽에는 혼동행렬, 클래스별 성능, 오분류 예시가 없어 어떤 숫자에서 흔들렸는지까지는 설명하지 못한다.</li>
+<li>YOLO 쪽은 반복 실험 기록이 충분하지만, 여기서는 seed72 혼동행렬만 대표 그림으로 제시했다.</li></ul>
+<h2 id="결론">결론</h2>
+<p>이번 실험 결과 기준으로 보면 두 결론은 비교적 분명하다.</p>
+<ul>
+<li>최고 단일 성능만 보면 ViT 전이학습이 더 높다. 보고서에 남아 있는 최고 validation accuracy는 <code>0.99548</code>이다.</li>
+<li>반복 실험 기준의 안정성과 재현성은 YOLO classification이 더 낫다. 네 번의 seed 실험이 거의 같은 성능 범위에 수렴했다.</li></ul>
+<p>실무적으로는 목적에 따라 선택이 갈린다. 재현 가능한 기준선과 가벼운 반복 실험이 필요하면 YOLO classification이 더 적절하다. 최고 정확도를 더 밀어 올리는 방향을 보려면 ViT 경로를 계속 탐색할 가치가 있지만, 그 전에 동일 분할 비교, 반복 실행, 혼동행렬과 오분류 분석을 먼저 보강하는 편이 맞다.</p>
+<h2 id="참고-문헌-및-그림-출처">참고 문헌 및 그림 출처</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., <em>An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale</em></a></li>
+<li><a href="https://docs.ultralytics.com/tasks/classify/">Ultralytics Docs, <em>Image Classification</em></a></li>
+<li><a href="https://en.wikipedia.org/wiki/Vision_transformer">Wikipedia, <em>Vision transformer</em></a></li></ul>
+
+  </main>
+</body>
+</html>
