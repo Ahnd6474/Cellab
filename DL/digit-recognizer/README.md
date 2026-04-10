@@ -17,7 +17,7 @@ pip install numpy pandas pillow scikit-learn torch transformers ultralytics flas
 Train the ViT classifier from the Kaggle CSV files:
 
 ```bash
-python train_mnist_yolo_cls.py
+python train_mnist_vit.py
 ```
 
 That run saves a Hugging Face model bundle under `mnist_vit_cls/model` and writes a submission CSV such as:
@@ -37,7 +37,8 @@ python train_mnist_ensemble.py
 
 This project collects a few ways to attack handwritten digit classification:
 
-- `train_mnist_yolo_cls.py` fine-tunes a pretrained image classifier from Hugging Face on the CSV-form Kaggle dataset.
+- `train_mnist_vit.py` fine-tunes a pretrained image classifier from Hugging Face on the CSV-form Kaggle dataset.
+- `tune_mnist_vit.py` runs grid search or random search across ViT hyperparameters and saves the best validation setup.
 - `train_mnist_ensemble.py` exports IDX files to image folders, trains two Ultralytics classification models plus a CNN, and blends them with soft voting.
 - `web/app.py` serves a small browser UI for drawing or uploading digits and running inference with the saved ViT model.
 - `digit_recognizer_reader.py` and `mnist_idx_reader.py` load Kaggle CSV or raw IDX-form MNIST files.
@@ -55,7 +56,7 @@ The folder is useful if you want to compare dataset formats and modeling styles 
 
 ## Main Scripts
 
-### `train_mnist_yolo_cls.py`
+### `train_mnist_vit.py`
 
 Fine-tune `facebook/deit-small-patch16-224` on `train.csv`, evaluate on a validation split, and create a Kaggle submission from `test.csv`.
 
@@ -75,7 +76,7 @@ Useful options:
 Example:
 
 ```bash
-python train_mnist_yolo_cls.py --epochs 6 --batch 64 --dry-run
+python train_mnist_vit.py --epochs 6 --batch 64 --dry-run
 ```
 
 Outputs:
@@ -83,6 +84,36 @@ Outputs:
 - `mnist_vit_cls/model/`
 - `mnist_vit_cls/submission_vit.csv`
 - `mnist_vit_cls/metrics.json`
+
+### `tune_mnist_vit.py`
+
+Search over discrete hyperparameter candidates for the same ViT classifier and rank them by validation accuracy or validation loss.
+
+Useful options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--search` | `grid` | Full cartesian product or shuffled random subset |
+| `--max-trials` | all combinations | Cap the number of scheduled trials |
+| `--metric` | `val_acc` | Metric used to select the best trial |
+| `--epoch-options` | `4 6` | Candidate epoch counts |
+| `--batch-options` | `32 64` | Candidate batch sizes |
+| `--backbone-lr-options` | `1e-5 2e-5` | Candidate backbone learning rates |
+| `--head-lr-options` | `5e-5 1e-4` | Candidate classifier-head learning rates |
+| `--weight-decay-options` | `1e-4 5e-4` | Candidate weight-decay values |
+
+Example:
+
+```bash
+python tune_mnist_vit.py --search random --max-trials 6 --train-limit 12000
+```
+
+Outputs:
+
+- `mnist_vit_tuning/trial_results.csv`
+- `mnist_vit_tuning/best_config.json`
+- `mnist_vit_tuning/search_manifest.json`
+- `mnist_vit_tuning/best_model/`
 
 ### `train_mnist_ensemble.py`
 
@@ -137,7 +168,7 @@ mnist_vit_cls/model
 | `train.csv` / `test.csv` | Kaggle Digit Recognizer tabular inputs |
 | `sample_submission.csv` | Kaggle submission template |
 | `train-images.idx3-ubyte` etc. | Raw MNIST IDX files |
-| `mnist_yolo_cls/` | Existing experiment artifacts and submissions |
+| `mnist_vit_cls/` | Existing ViT experiment artifacts and submissions |
 | `web/templates/index.html` | Browser UI template |
 
 ## Examples
@@ -145,7 +176,7 @@ mnist_vit_cls/model
 Train a smaller ViT run for a quick smoke test:
 
 ```bash
-python train_mnist_yolo_cls.py --train-limit 5000 --epochs 2 --batch 32
+python train_mnist_vit.py --train-limit 5000 --epochs 2 --batch 32
 ```
 
 Train the ensemble with custom weights:
